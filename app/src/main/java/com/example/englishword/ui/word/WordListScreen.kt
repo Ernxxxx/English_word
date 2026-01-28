@@ -1,12 +1,6 @@
 package com.example.englishword.ui.word
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,34 +16,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Book
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -63,19 +47,10 @@ import com.example.englishword.data.local.entity.Word
 @Composable
 fun WordListScreen(
     levelId: Long,
-    onNavigateToWordEdit: (Long, Long?) -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: WordListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(uiState.error) {
-        uiState.error?.let { error ->
-            snackbarHostState.showSnackbar(error)
-            viewModel.onEvent(WordListEvent.ClearError)
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -99,20 +74,7 @@ fun WordListScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { onNavigateToWordEdit(levelId, null) },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "単語を追加",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -170,8 +132,7 @@ fun WordListScreen(
                 }
                 uiState.filteredWords.isEmpty() -> {
                     EmptyWordListState(
-                        hasSearchQuery = uiState.searchQuery.isNotEmpty(),
-                        onAddWord = { onNavigateToWordEdit(levelId, null) }
+                        hasSearchQuery = uiState.searchQuery.isNotEmpty()
                     )
                 }
                 else -> {
@@ -183,15 +144,11 @@ fun WordListScreen(
                             items = uiState.filteredWords,
                             key = { it.id }
                         ) { word ->
-                            SwipeToDeleteWordItem(
-                                word = word,
-                                onClick = { onNavigateToWordEdit(levelId, word.id) },
-                                onDelete = { viewModel.onEvent(WordListEvent.DeleteWord(word)) }
-                            )
+                            WordListItem(word = word)
                         }
 
                         item {
-                            Spacer(modifier = Modifier.height(80.dp)) // FAB spacing
+                            Spacer(modifier = Modifier.height(16.dp))
                         }
                     }
                 }
@@ -200,61 +157,12 @@ fun WordListScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SwipeToDeleteWordItem(
-    word: Word,
-    onClick: () -> Unit,
-    onDelete: () -> Unit
-) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { dismissValue ->
-            if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
-                onDelete()
-                true
-            } else {
-                false
-            }
-        }
-    )
-
-    SwipeToDismissBox(
-        state = dismissState,
-        backgroundContent = {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.errorContainer)
-                    .padding(horizontal = 20.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "削除",
-                    tint = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        },
-        enableDismissFromStartToEnd = false,
-        enableDismissFromEndToStart = true
-    ) {
-        WordListItem(
-            word = word,
-            onClick = onClick
-        )
-    }
-}
-
-@Composable
-private fun WordListItem(
-    word: Word,
-    onClick: () -> Unit
-) {
+private fun WordListItem(word: Word) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable { onClick() },
+            .padding(horizontal = 16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -298,6 +206,18 @@ private fun WordListItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+
+                // 例文があれば表示
+                if (!word.exampleEn.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = word.exampleEn,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
@@ -317,10 +237,7 @@ private fun getMasteryColor(masteryLevel: Int): Color {
 }
 
 @Composable
-private fun EmptyWordListState(
-    hasSearchQuery: Boolean,
-    onAddWord: () -> Unit
-) {
+private fun EmptyWordListState(hasSearchQuery: Boolean) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -339,20 +256,10 @@ private fun EmptyWordListState(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = if (hasSearchQuery) "検索結果がありません" else "単語がまだありません",
+                text = if (hasSearchQuery) "検索結果がありません" else "単語がありません",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (!hasSearchQuery) {
-                Text(
-                    text = "右下の + ボタンから単語を追加しましょう",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
         }
     }
 }
