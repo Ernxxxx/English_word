@@ -1,0 +1,908 @@
+package com.example.englishword.ui.home
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.englishword.domain.model.Level
+import com.example.englishword.domain.model.LevelWithProgress
+import com.example.englishword.domain.model.ParentLevelWithChildren
+import com.example.englishword.ads.AdManager
+import com.example.englishword.ui.components.BannerAdView
+import com.example.englishword.ui.components.LevelCard
+import com.example.englishword.ui.components.StreakBadgeJapanese
+import com.example.englishword.ui.theme.CorrectGreen
+import com.example.englishword.ui.theme.EnglishWordTheme
+import com.example.englishword.ui.theme.PremiumGold
+import kotlinx.coroutines.flow.collectLatest
+
+/**
+ * Home screen displaying the list of levels and study statistics.
+ *
+ * @param onNavigateToStudy Called when navigating to study a level
+ * @param onNavigateToWordList Called when navigating to view word list
+ * @param onNavigateToSettings Called when navigating to settings
+ * @param onNavigateToPremium Called when navigating to premium screen
+ * @param viewModel The HomeViewModel
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreen(
+    onNavigateToStudy: (Long) -> Unit,
+    onNavigateToWordList: (Long) -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onNavigateToPremium: () -> Unit,
+    viewModel: HomeViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val listState = rememberLazyListState()
+
+    // Determine if FAB should be expanded
+    val isFabExpanded by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+        }
+    }
+
+    // Handle events
+    LaunchedEffect(Unit) {
+        viewModel.events.collectLatest { event ->
+            when (event) {
+                is HomeEvent.NavigateToStudy -> onNavigateToStudy(event.levelId)
+                is HomeEvent.NavigateToWordList -> onNavigateToWordList(event.levelId)
+                is HomeEvent.NavigateToSettings -> onNavigateToSettings()
+                is HomeEvent.NavigateToPremium -> onNavigateToPremium()
+                is HomeEvent.ShowError -> snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
+
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "English Word",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                actions = {
+                    if (!uiState.isPremium) {
+                        IconButton(onClick = onNavigateToPremium) {
+                            Icon(
+                                imageVector = Icons.Outlined.Star,
+                                contentDescription = "Premium",
+                                tint = PremiumGold
+                            )
+                        }
+                    }
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings"
+                        )
+                    }
+                },
+                scrollBehavior = scrollBehavior
+            )
+        },
+        floatingActionButton = {
+            AnimatedVisibility(
+                visible = !uiState.isLoading,
+                enter = fadeIn() + slideInVertically { it },
+                exit = fadeOut() + slideOutVertically { it }
+            ) {
+                if (isFabExpanded) {
+                    ExtendedFloatingActionButton(
+                        onClick = { viewModel.showAddLevelDialog() },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null
+                            )
+                        },
+                        text = { Text("Add Level") }
+                    )
+                } else {
+                    FloatingActionButton(
+                        onClick = { viewModel.showAddLevelDialog() }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Level"
+                        )
+                    }
+                }
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            when {
+                uiState.isLoading -> {
+                    LoadingContent()
+                }
+                uiState.error != null -> {
+                    ErrorContent(
+                        error = uiState.error!!,
+                        onRetry = { viewModel.refresh() }
+                    )
+                }
+                else -> {
+                    HomeContent(
+                        uiState = uiState,
+                        listState = listState,
+                        onLevelClick = { viewModel.navigateToStudy(it.level.id) },
+                        onWordListClick = { viewModel.navigateToWordList(it.level.id) },
+                        onDeleteClick = { viewModel.showDeleteDialog(it) },
+                        onPremiumClick = onNavigateToPremium,
+                        onParentClick = { viewModel.toggleParentExpansion(it) }
+                    )
+                }
+            }
+
+            // Added: Banner ad at bottom (above FAB) - hidden for premium users
+            if (!uiState.isPremium) {
+                BannerAdView(
+                    adUnitId = AdManager.BANNER_AD_UNIT_ID,
+                    isPremium = uiState.isPremium,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 80.dp) // Space for FAB
+                )
+            }
+        }
+    }
+
+    // Add level dialog
+    if (uiState.showAddLevelDialog) {
+        AddLevelDialog(
+            canAddLevel = uiState.canAddLevel,
+            remainingSlots = uiState.remainingLevelSlots,
+            isPremium = uiState.isPremium,
+            onDismiss = { viewModel.hideAddLevelDialog() },
+            onConfirm = { name -> viewModel.addLevel(name) },
+            onPremiumClick = onNavigateToPremium
+        )
+    }
+
+    // Delete confirmation dialog
+    if (uiState.showDeleteDialog && uiState.levelToDelete != null) {
+        DeleteLevelDialog(
+            levelName = uiState.levelToDelete!!.level.name,
+            wordCount = uiState.levelToDelete!!.wordCount,
+            onDismiss = { viewModel.hideDeleteDialog() },
+            onConfirm = { viewModel.deleteLevel() }
+        )
+    }
+}
+
+@Composable
+private fun HomeContent(
+    uiState: HomeUiState,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    onLevelClick: (LevelWithProgress) -> Unit,
+    onWordListClick: (LevelWithProgress) -> Unit,
+    onDeleteClick: (LevelWithProgress) -> Unit,
+    onPremiumClick: () -> Unit,
+    onParentClick: (Long) -> Unit = {}
+) {
+    LazyColumn(
+        state = listState,
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Stats header
+        item {
+            StatsHeader(
+                todayStudiedCount = uiState.todayStudiedCount,
+                dailyGoal = uiState.dailyGoal,
+                streak = uiState.streak,
+                isPremium = uiState.isPremium
+            )
+        }
+
+        // Hierarchical level cards
+        if (uiState.parentLevels.isEmpty()) {
+            item {
+                EmptyLevelsContent()
+            }
+        } else {
+            uiState.parentLevels.forEach { parentWithChildren ->
+                // Parent level header
+                item(key = "parent_${parentWithChildren.parentLevel.level.id}") {
+                    ParentLevelCard(
+                        parentWithChildren = parentWithChildren,
+                        onClick = { onParentClick(parentWithChildren.parentLevel.level.id) }
+                    )
+                }
+
+                // Child levels (animated visibility)
+                items(
+                    items = if (parentWithChildren.isExpanded) parentWithChildren.children else emptyList(),
+                    key = { "child_${it.level.id}" }
+                ) { childLevel ->
+                    ChildLevelCard(
+                        levelWithProgress = childLevel,
+                        onClick = { onLevelClick(childLevel) },
+                        onWordListClick = { onWordListClick(childLevel) }
+                    )
+                }
+            }
+        }
+
+        // Free tier notice
+        if (!uiState.isPremium && uiState.parentLevels.isNotEmpty()) {
+            item {
+                FreeTierNotice(
+                    remainingSlots = uiState.remainingLevelSlots,
+                    onPremiumClick = onPremiumClick
+                )
+            }
+        }
+
+        // Bottom spacing for FAB
+        item {
+            Spacer(modifier = Modifier.height(80.dp))
+        }
+    }
+}
+
+@Composable
+private fun StatsHeader(
+    todayStudiedCount: Int,
+    dailyGoal: Int,
+    streak: Int,
+    isPremium: Boolean
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Today's Study",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            text = todayStudiedCount.toString(),
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = if (todayStudiedCount >= dailyGoal) {
+                                CorrectGreen
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            }
+                        )
+                        Text(
+                            text = " / $dailyGoal words",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
+                }
+
+                StreakBadgeJapanese(streak = streak)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Daily progress bar
+            val progress = if (dailyGoal > 0) {
+                (todayStudiedCount.toFloat() / dailyGoal).coerceAtMost(1f)
+            } else 0f
+
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = if (progress >= 1f) CorrectGreen else MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+
+            if (todayStudiedCount >= dailyGoal) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Daily goal achieved! Great job!",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = CorrectGreen,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ParentLevelCard(
+    parentWithChildren: ParentLevelWithChildren,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Expand/Collapse indicator
+            Icon(
+                imageVector = if (parentWithChildren.isExpanded) {
+                    Icons.Default.KeyboardArrowDown
+                } else {
+                    Icons.Default.KeyboardArrowRight
+                },
+                contentDescription = if (parentWithChildren.isExpanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = parentWithChildren.parentLevel.level.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${parentWithChildren.children.size}ユニット / ${parentWithChildren.totalWordCount}語",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                )
+            }
+
+            // Progress
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "${parentWithChildren.progressPercent}%",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (parentWithChildren.progressPercent >= 100) {
+                        CorrectGreen
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                LinearProgressIndicator(
+                    progress = { parentWithChildren.progressFraction },
+                    modifier = Modifier
+                        .width(60.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = if (parentWithChildren.progressFraction >= 1f) {
+                        CorrectGreen
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChildLevelCard(
+    levelWithProgress: LevelWithProgress,
+    onClick: () -> Unit,
+    onWordListClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = levelWithProgress.level.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${levelWithProgress.wordCount}語",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Progress
+            Text(
+                text = "${levelWithProgress.progressPercent}%",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (levelWithProgress.isCompleted) {
+                    CorrectGreen
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Word list button
+            TextButton(onClick = onWordListClick) {
+                Text(
+                    text = "単語一覧",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyLevelsContent() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "\uD83D\uDCDA",
+                fontSize = 48.sp
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "No Levels Yet",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Tap the + button to create your first vocabulary level",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun FreeTierNotice(
+    remainingSlots: Int,
+    onPremiumClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = PremiumGold.copy(alpha = 0.1f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Star,
+                contentDescription = null,
+                tint = PremiumGold,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = if (remainingSlots > 0) {
+                        "$remainingSlots level slot${if (remainingSlots > 1) "s" else ""} remaining"
+                    } else {
+                        "Level limit reached"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "Upgrade to Premium for unlimited levels",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            TextButton(onClick = onPremiumClick) {
+                Text(
+                    text = "Upgrade",
+                    color = PremiumGold,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingContent() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+private fun ErrorContent(
+    error: String,
+    onRetry: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Oops!",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = error,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        TextButton(onClick = onRetry) {
+            Text("Retry")
+        }
+    }
+}
+
+@Composable
+private fun AddLevelDialog(
+    canAddLevel: Boolean,
+    remainingSlots: Int,
+    isPremium: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+    onPremiumClick: () -> Unit
+) {
+    var levelName by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Add New Level",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                if (!isPremium && remainingSlots <= 1) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = PremiumGold.copy(alpha = 0.1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Star,
+                                contentDescription = null,
+                                tint = PremiumGold,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (remainingSlots == 1) {
+                                    "Last free slot!"
+                                } else {
+                                    "Upgrade for unlimited levels"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = levelName,
+                    onValueChange = { levelName = it },
+                    label = { Text("Level Name") },
+                    placeholder = { Text("e.g., TOEFL, GRE, Daily...") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            focusManager.clearFocus()
+                            if (levelName.isNotBlank()) {
+                                onConfirm(levelName.trim())
+                            }
+                        }
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (levelName.isNotBlank()) {
+                        onConfirm(levelName.trim())
+                    }
+                },
+                enabled = levelName.isNotBlank()
+            ) {
+                Text("Add")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeleteLevelDialog(
+    levelName: String,
+    wordCount: Int,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Delete Level",
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.error
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Are you sure you want to delete \"$levelName\"?"
+                )
+                if (wordCount > 0) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "This will also delete $wordCount word${if (wordCount > 1) "s" else ""}.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm
+            ) {
+                Text(
+                    text = "Delete",
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HomeScreenPreview() {
+    val grade1Units = listOf(
+        LevelWithProgress(
+            level = Level(id = 11, name = "Unit 1 - 基本動詞", displayOrder = 0, parentId = 1),
+            wordCount = 10,
+            masteredCount = 8
+        ),
+        LevelWithProgress(
+            level = Level(id = 12, name = "Unit 2 - 家族・学校", displayOrder = 1, parentId = 1),
+            wordCount = 10,
+            masteredCount = 5
+        )
+    )
+    val grade1Parent = LevelWithProgress(
+        level = Level(id = 1, name = "中学1年", displayOrder = 0),
+        wordCount = 50,
+        masteredCount = 35
+    )
+
+    EnglishWordTheme {
+        HomeContent(
+            uiState = HomeUiState(
+                isLoading = false,
+                parentLevels = listOf(
+                    ParentLevelWithChildren(
+                        parentLevel = grade1Parent,
+                        children = grade1Units,
+                        isExpanded = true
+                    )
+                ),
+                todayStudiedCount = 15,
+                streak = 7,
+                isPremium = false,
+                dailyGoal = 20
+            ),
+            listState = rememberLazyListState(),
+            onLevelClick = {},
+            onWordListClick = {},
+            onDeleteClick = {},
+            onPremiumClick = {},
+            onParentClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HomeScreenEmptyPreview() {
+    EnglishWordTheme {
+        HomeContent(
+            uiState = HomeUiState(
+                isLoading = false,
+                parentLevels = emptyList(),
+                todayStudiedCount = 0,
+                streak = 0,
+                isPremium = false,
+                dailyGoal = 20
+            ),
+            listState = rememberLazyListState(),
+            onLevelClick = {},
+            onWordListClick = {},
+            onDeleteClick = {},
+            onPremiumClick = {},
+            onParentClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun StatsHeaderPreview() {
+    EnglishWordTheme {
+        StatsHeader(
+            todayStudiedCount = 25,
+            dailyGoal = 20,
+            streak = 14,
+            isPremium = true
+        )
+    }
+}
