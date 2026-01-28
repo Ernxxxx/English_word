@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">英単語帳</string>
+
+    <!-- Common -->
+    <string name="ok">OK</string>
+    <string name="cancel">キャンセル</string>
+    <string name="save">保存</string>
+    <string name="delete">削除</string>
+    <string name="edit">編集</string>
+    <string name="add">追加</string>
+    <string name="back">戻る</string>
+    <string name="next">次へ</string>
+    <string name="start">始める</string>
+    <string name="close">閉じる</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title_1">レベル別に学習</string>
+    <string name="onboarding_desc_1">基礎・標準・上級\n自分に合ったレベルから始めよう</string>
+    <string name="onboarding_title_2">カードで覚える</string>
+    <string name="onboarding_desc_2">タップでカードを反転\n覚えた・まだ・あとでを選択</string>
+    <string name="onboarding_title_3">毎日続けよう</string>
+    <string name="onboarding_desc_3">連続学習でstreakを伸ばそう\nあなたの成長を記録します</string>
+
+    <!-- Home -->
+    <string name="home_title">英単語帳</string>
+    <string name="today_studied">今日の学習</string>
+    <string name="words_count">%d語</string>
+    <string name="streak_days">連続 %d日目</string>
+    <string name="progress_format">%1$d / %2$d 語 習得</string>
+    <string name="add_level">レベル追加</string>
+    <string name="level_limit_free">無料版はレベル3つまでです</string>
+
+    <!-- Study -->
+    <string name="study_progress">%1$d / %2$d</string>
+    <string name="tap_to_flip">タップで確認</string>
+    <string name="btn_again">まだ</string>
+    <string name="btn_later">あとで</string>
+    <string name="btn_known">覚えた</string>
+
+    <!-- Study Result -->
+    <string name="study_complete">学習完了！</string>
+    <string name="result_today">今日の学習</string>
+    <string name="result_known">覚えた</string>
+    <string name="result_again">まだ</string>
+    <string name="result_later">あとで</string>
+    <string name="back_to_home">ホームに戻る</string>
+    <string name="study_again">もう一度学習</string>
+
+    <!-- Word Management -->
+    <string name="word_list_title">%sの単語</string>
+    <string name="add_word">単語を追加</string>
+    <string name="edit_word">単語を編集</string>
+    <string name="english_word">英単語</string>
+    <string name="japanese_meaning">日本語訳</string>
+    <string name="example_en">例文（英語）</string>
+    <string name="example_ja">例文（日本語）</string>
+    <string name="select_level">レベル選択</string>
+    <string name="search_words">検索...</string>
+    <string name="word_limit_free">無料版は200語までです</string>
+    <string name="delete_word_confirm">この単語を削除しますか？</string>
+
+    <!-- Settings -->
+    <string name="settings_title">設定</string>
+    <string name="premium_upgrade">Premiumにアップグレード</string>
+    <string name="premium_desc">月額300円で広告なし・無制限の単語登録</string>
+    <string name="premium_detail">詳しく見る</string>
+    <string name="study_settings">学習設定</string>
+    <string name="daily_goal">1日の目標単語数</string>
+    <string name="notification">通知</string>
+    <string name="display_settings">表示設定</string>
+    <string name="dark_mode">ダークモード</string>
+    <string name="others">その他</string>
+    <string name="terms_of_service">利用規約</string>
+    <string name="privacy_policy">プライバシーポリシー</string>
+    <string name="contact">お問い合わせ</string>
+    <string name="version">バージョン</string>
+
+    <!-- Premium -->
+    <string name="premium_title">Premium</string>
+    <string name="premium_feature_1">広告なし</string>
+    <string name="premium_feature_2">レベル無制限</string>
+    <string name="premium_feature_3">単語数無制限</string>
+    <string name="premium_feature_4">学習統計グラフ</string>
+    <string name="premium_price">月額 ¥300</string>
+    <string name="purchase">購入する</string>
+    <string name="cancel_anytime">いつでもキャンセル可能</string>
+    <string name="already_premium">Premiumメンバーです</string>
+
+    <!-- Errors -->
+    <string name="error_general">エラーが発生しました</string>
+    <string name="error_network">ネットワークエラー</string>
+    <string name="error_purchase">購入処理に失敗しました</string>
+    <string name="no_words">単語がありません</string>
+    <string name="no_words_to_study">学習する単語がありません</string>
+
+    <!-- Default Levels -->
+    <string name="level_basic">基礎</string>
+    <string name="level_standard">標準</string>
+    <string name="level_advanced">上級</string>
+</resources>
