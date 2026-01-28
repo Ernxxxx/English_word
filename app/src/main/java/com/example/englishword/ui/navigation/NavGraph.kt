@@ -155,9 +155,6 @@ fun EnglishWordNavHost(
             val levelId = backStackEntry.arguments?.getLong(NavArgs.LEVEL_ID) ?: 0L
             WordListScreen(
                 levelId = levelId,
-                onNavigateToWordEdit = { lvlId, wordId ->
-                    navController.navigate(Routes.wordEdit(lvlId, wordId))
-                },
                 onNavigateBack = {
                     navController.popBackStack()
                 }
