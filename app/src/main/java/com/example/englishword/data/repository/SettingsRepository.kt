@@ -1,5 +1,6 @@
 package com.example.englishword.data.repository
 
+import com.example.englishword.BuildConfig
 import com.example.englishword.data.local.dao.UserSettingsDao
 import com.example.englishword.data.local.entity.UserSettings
 import kotlinx.coroutines.flow.Flow
@@ -324,15 +325,25 @@ class SettingsRepository @Inject constructor(
 
     /**
      * Check if user has premium.
+     * DEBUG builds always return true for easier testing.
      */
     fun isPremium(): Flow<Boolean> {
+        // DEBUGビルドは自動的にプレミアム
+        if (BuildConfig.DEBUG) {
+            return kotlinx.coroutines.flow.flowOf(true)
+        }
         return getBooleanValue(KEY_IS_PREMIUM, false)
     }
 
     /**
      * Check if user has premium synchronously.
+     * DEBUG builds always return true for easier testing.
      */
     suspend fun isPremiumSync(): Boolean {
+        // DEBUGビルドは自動的にプレミアム
+        if (BuildConfig.DEBUG) {
+            return true
+        }
         return getBooleanValueSync(KEY_IS_PREMIUM, false)
     }
 
