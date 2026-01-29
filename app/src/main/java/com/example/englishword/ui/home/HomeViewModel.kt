@@ -7,6 +7,7 @@ import com.example.englishword.data.repository.LevelRepository
 import com.example.englishword.ads.AdManager
 import com.example.englishword.data.repository.SettingsRepository
 import com.example.englishword.data.repository.StudyRepository
+import com.example.englishword.data.repository.UnlockRepository
 import com.example.englishword.data.repository.WordRepository
 import com.example.englishword.domain.model.LevelWithProgress
 import com.example.englishword.domain.model.ParentLevelWithChildren
@@ -34,6 +35,7 @@ class HomeViewModel @Inject constructor(
     private val wordRepository: WordRepository,
     private val studyRepository: StudyRepository,
     private val settingsRepository: SettingsRepository,
+    private val unlockRepository: UnlockRepository,
     val adManager: AdManager // Added: AdManager injection for ad display
 ) : ViewModel() {
 
@@ -60,9 +62,10 @@ class HomeViewModel @Inject constructor(
                     levelRepository.getParentLevels(),
                     studyRepository.getTodayStats(),
                     settingsRepository.isPremium(),
-                    settingsRepository.getDailyGoal()
-                ) { parentLevels, todayStats, isPremium, dailyGoal ->
-                    CombinedData(parentLevels, todayStats?.studiedCount ?: 0, todayStats?.streak ?: 0, isPremium, dailyGoal)
+                    settingsRepository.getDailyGoal(),
+                    unlockRepository.getTodayReviewCountFlow()
+                ) { parentLevels, todayStats, isPremium, dailyGoal, todayReviewCount ->
+                    CombinedData(parentLevels, todayStats?.studiedCount ?: 0, todayStats?.streak ?: 0, isPremium, dailyGoal, todayReviewCount)
                 }
                     .catch { e ->
                         _uiState.update {
@@ -75,7 +78,7 @@ class HomeViewModel @Inject constructor(
                     .collect { data ->
                         // Build hierarchical structure
                         val parentLevelsWithChildren = data.levels.map { parentLevel ->
-                            buildParentWithChildren(parentLevel)
+                            buildParentWithChildren(parentLevel, data.isPremium)
                         }
 
                         // Also create flat list for backward compatibility
@@ -92,6 +95,7 @@ class HomeViewModel @Inject constructor(
                                 streak = data.streak,
                                 isPremium = data.isPremium,
                                 dailyGoal = data.dailyGoal,
+                                todayReviewCount = data.todayReviewCount,
                                 error = null
                             )
                         }
@@ -110,13 +114,13 @@ class HomeViewModel @Inject constructor(
     /**
      * Build parent level with its children and progress.
      */
-    private suspend fun buildParentWithChildren(parentLevel: Level): ParentLevelWithChildren {
+    private suspend fun buildParentWithChildren(parentLevel: Level, isPremium: Boolean): ParentLevelWithChildren {
         val childLevels = levelRepository.getChildLevelsSync(parentLevel.id)
         val childrenWithProgress = childLevels.map { childLevel ->
-            loadLevelProgress(childLevel)
+            loadLevelProgress(childLevel, isPremium)
         }
 
-        val parentWithProgress = loadLevelProgress(parentLevel)
+        val parentWithProgress = loadLevelProgress(parentLevel, isPremium)
 
         return ParentLevelWithChildren(
             parentLevel = parentWithProgress,
@@ -147,9 +151,19 @@ class HomeViewModel @Inject constructor(
     /**
      * Load progress information for a level.
      */
-    private suspend fun loadLevelProgress(level: Level): LevelWithProgress {
+    private suspend fun loadLevelProgress(level: Level, isPremium: Boolean): LevelWithProgress {
         val wordCount = wordRepository.getWordCountByLevel(level.id).first()
         val masteredCount = wordRepository.getMasteredCountByLevel(level.id).first()
+
+        // Check if this is a child level (unit) and needs unlock check
+        val isParentLevel = level.parentId == null
+        val isLocked = if (isPremium || isParentLevel) {
+            false
+        } else {
+            !unlockRepository.isUnitUnlocked(level.id, isPremium, isParentLevel)
+        }
+
+        val remainingTime = if (isLocked) 0L else unlockRepository.getRemainingUnlockTime(level.id)
 
         return LevelWithProgress(
             level = com.example.englishword.domain.model.Level(
@@ -159,7 +173,9 @@ class HomeViewModel @Inject constructor(
                 parentId = level.parentId
             ),
             wordCount = wordCount,
-            masteredCount = masteredCount
+            masteredCount = masteredCount,
+            isLocked = isLocked,
+            remainingUnlockTimeMs = remainingTime
         )
     }
 
@@ -336,6 +352,88 @@ class HomeViewModel @Inject constructor(
         return AdManager.BANNER_AD_UNIT_ID
     }
 
+    // ==================== Unit Unlock Methods ====================
+
+    /**
+     * Unlock a unit after watching an ad.
+     * @param levelId The level ID to unlock
+     */
+    fun unlockUnitWithAd(levelId: Long) {
+        viewModelScope.launch {
+            try {
+                unlockRepository.unlockUnitWithAd(levelId)
+                // Refresh data to update UI
+                loadData()
+            } catch (e: Exception) {
+                _events.emit(HomeEvent.ShowError("Failed to unlock unit: ${e.message}"))
+            }
+        }
+    }
+
+    /**
+     * Check if a level is locked.
+     */
+    suspend fun isLevelLocked(levelId: Long): Boolean {
+        val isPremium = _uiState.value.isPremium
+        if (isPremium) return false
+        return !unlockRepository.isUnitUnlocked(levelId, isPremium, false)
+    }
+
+    /**
+     * Get remaining unlock time for a level.
+     */
+    suspend fun getRemainingUnlockTime(levelId: Long): Long {
+        return unlockRepository.getRemainingUnlockTime(levelId)
+    }
+
+    /**
+     * Show the unlock dialog for a locked level.
+     */
+    fun showUnlockDialog(levelId: Long) {
+        _uiState.update { it.copy(showUnlockDialog = true, levelToUnlock = levelId) }
+    }
+
+    /**
+     * Hide the unlock dialog.
+     */
+    fun hideUnlockDialog() {
+        _uiState.update { it.copy(showUnlockDialog = false, levelToUnlock = null) }
+    }
+
+    /**
+     * Request to watch ad for unlock. Emits event for UI to show rewarded ad.
+     */
+    fun requestWatchAdForUnlock() {
+        val levelId = _uiState.value.levelToUnlock ?: return
+        hideUnlockDialog()
+        viewModelScope.launch {
+            _events.emit(HomeEvent.ShowRewardedAd(levelId))
+        }
+    }
+
+    /**
+     * Handle unlock after watching ad successfully.
+     */
+    fun onAdWatchedForUnlock(levelId: Long) {
+        viewModelScope.launch {
+            try {
+                unlockRepository.unlockUnitWithAd(levelId)
+                _events.emit(HomeEvent.UnitUnlocked(levelId))
+                // Refresh data to update UI
+                loadData()
+            } catch (e: Exception) {
+                _events.emit(HomeEvent.ShowError("Failed to unlock unit: ${e.message}"))
+            }
+        }
+    }
+
+    /**
+     * Get today's review count.
+     */
+    private suspend fun loadTodayReviewCount(): Int {
+        return unlockRepository.getTodayReviewCount()
+    }
+
     /**
      * Data class for combining multiple Flow results.
      */
@@ -344,6 +442,7 @@ class HomeViewModel @Inject constructor(
         val todayStudiedCount: Int,
         val streak: Int,
         val isPremium: Boolean,
-        val dailyGoal: Int
+        val dailyGoal: Int,
+        val todayReviewCount: Int
     )
 }

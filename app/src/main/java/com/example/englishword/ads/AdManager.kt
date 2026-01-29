@@ -11,6 +11,8 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.gms.ads.rewarded.RewardedAd
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,14 +43,17 @@ class AdManager @Inject constructor(
         // Test Ad Unit IDs - Replace with real IDs for production
         const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
         const val TEST_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
+        const val TEST_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
 
         // Production Ad Unit IDs - Replace these with your actual ad unit IDs
         // const val PRODUCTION_BANNER_AD_UNIT_ID = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
         // const val PRODUCTION_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+        // const val PRODUCTION_REWARDED_AD_UNIT_ID = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
 
         // For now, use test IDs
         val BANNER_AD_UNIT_ID = TEST_BANNER_AD_UNIT_ID
         val INTERSTITIAL_AD_UNIT_ID = TEST_INTERSTITIAL_AD_UNIT_ID
+        val REWARDED_AD_UNIT_ID = TEST_REWARDED_AD_UNIT_ID
 
         // Frequency cap for interstitial ads (show every Nth study completion)
         const val INTERSTITIAL_FREQUENCY_CAP = 3
@@ -63,6 +68,10 @@ class AdManager @Inject constructor(
     private var interstitialAd: InterstitialAd? = null
     private val _isInterstitialLoaded = MutableStateFlow(false)
     val isInterstitialLoaded: StateFlow<Boolean> = _isInterstitialLoaded.asStateFlow()
+
+    private var rewardedAd: RewardedAd? = null
+    private val _isRewardedLoaded = MutableStateFlow(false)
+    val isRewardedLoaded: StateFlow<Boolean> = _isRewardedLoaded.asStateFlow()
 
     // Frequency cap counter for interstitial ads
     private var studyCompletionCount = 0
@@ -101,9 +110,10 @@ class AdManager @Inject constructor(
             _isInitialized.value = true
             Log.d(TAG, "AdMob SDK initialized successfully")
 
-            // Pre-load interstitial ad after initialization
+            // Pre-load ads after initialization
             if (!_isPremium.value) {
                 loadInterstitialAd()
+                loadRewardedAd()
             }
         }
     }
@@ -340,4 +350,115 @@ class AdManager @Inject constructor(
      * Get current completion count (for debugging/testing).
      */
     fun getCompletionCount(): Int = studyCompletionCount
+
+    // ==================== Rewarded Ad Methods ====================
+
+    /**
+     * Load a rewarded ad for unit unlock.
+     */
+    fun loadRewardedAd() {
+        if (_isPremium.value) {
+            Log.d(TAG, "User is premium, skipping rewarded ad load")
+            return
+        }
+
+        if (!_isInitialized.value) {
+            Log.d(TAG, "AdMob SDK not initialized, cannot load rewarded ad")
+            return
+        }
+
+        if (rewardedAd != null) {
+            Log.d(TAG, "Rewarded ad already loaded")
+            return
+        }
+
+        val adRequest = createAdRequest()
+        RewardedAd.load(
+            context,
+            REWARDED_AD_UNIT_ID,
+            adRequest,
+            object : RewardedAdLoadCallback() {
+                override fun onAdFailedToLoad(adError: LoadAdError) {
+                    Log.e(TAG, "Rewarded ad failed to load: ${adError.message}")
+                    rewardedAd = null
+                    _isRewardedLoaded.value = false
+                }
+
+                override fun onAdLoaded(ad: RewardedAd) {
+                    Log.d(TAG, "Rewarded ad loaded successfully")
+                    rewardedAd = ad
+                    _isRewardedLoaded.value = true
+                }
+            }
+        )
+    }
+
+    /**
+     * Show a rewarded ad for unit unlock.
+     * @param activity The activity to show the ad in
+     * @param onRewarded Callback when user earns the reward
+     * @param onAdDismissed Callback when ad is dismissed without reward
+     */
+    fun showRewardedAd(
+        activity: Activity,
+        onRewarded: () -> Unit,
+        onAdDismissed: () -> Unit = {}
+    ) {
+        if (_isPremium.value) {
+            Log.d(TAG, "User is premium, not showing rewarded ad")
+            onRewarded() // Grant reward for premium users
+            return
+        }
+
+        val ad = rewardedAd
+        if (ad != null) {
+            var wasRewarded = false
+
+            ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+                override fun onAdClicked() {
+                    Log.d(TAG, "Rewarded ad clicked")
+                }
+
+                override fun onAdDismissedFullScreenContent() {
+                    Log.d(TAG, "Rewarded ad dismissed, wasRewarded=$wasRewarded")
+                    rewardedAd = null
+                    _isRewardedLoaded.value = false
+
+                    if (wasRewarded) {
+                        onRewarded()
+                    } else {
+                        onAdDismissed()
+                    }
+
+                    // Pre-load next rewarded ad
+                    loadRewardedAd()
+                }
+
+                override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                    Log.e(TAG, "Rewarded ad failed to show: ${adError.message}")
+                    rewardedAd = null
+                    _isRewardedLoaded.value = false
+                    onAdDismissed()
+                }
+
+                override fun onAdImpression() {
+                    Log.d(TAG, "Rewarded ad impression recorded")
+                }
+
+                override fun onAdShowedFullScreenContent() {
+                    Log.d(TAG, "Rewarded ad showed")
+                }
+            }
+
+            ad.show(activity) { rewardItem ->
+                Log.d(TAG, "User earned reward: ${rewardItem.amount} ${rewardItem.type}")
+                wasRewarded = true
+            }
+        } else {
+            Log.d(TAG, "Rewarded ad not available")
+            onAdDismissed()
+            // Try to load for next time
+            loadRewardedAd()
+        }
+    }
 }

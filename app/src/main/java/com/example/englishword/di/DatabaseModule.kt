@@ -7,6 +7,7 @@ import com.example.englishword.data.local.InitialDataSeeder
 import com.example.englishword.data.local.dao.LevelDao
 import com.example.englishword.data.local.dao.StudyRecordDao
 import com.example.englishword.data.local.dao.StudySessionDao
+import com.example.englishword.data.local.dao.UnitUnlockDao
 import com.example.englishword.data.local.dao.UserSettingsDao
 import com.example.englishword.data.local.dao.UserStatsDao
 import com.example.englishword.data.local.dao.WordDao
@@ -80,5 +81,11 @@ object DatabaseModule {
     @Singleton
     fun provideUserSettingsDao(database: AppDatabase): UserSettingsDao {
         return database.userSettingsDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideUnitUnlockDao(database: AppDatabase): UnitUnlockDao {
+        return database.unitUnlockDao()
     }
 }

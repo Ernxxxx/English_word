@@ -8,12 +8,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.englishword.data.local.dao.LevelDao
 import com.example.englishword.data.local.dao.StudyRecordDao
 import com.example.englishword.data.local.dao.StudySessionDao
+import com.example.englishword.data.local.dao.UnitUnlockDao
 import com.example.englishword.data.local.dao.UserSettingsDao
 import com.example.englishword.data.local.dao.UserStatsDao
 import com.example.englishword.data.local.dao.WordDao
 import com.example.englishword.data.local.entity.Level
 import com.example.englishword.data.local.entity.StudyRecord
 import com.example.englishword.data.local.entity.StudySession
+import com.example.englishword.data.local.entity.UnitUnlock
 import com.example.englishword.data.local.entity.UserSettings
 import com.example.englishword.data.local.entity.UserStats
 import com.example.englishword.data.local.entity.Word
@@ -28,9 +30,10 @@ import kotlinx.coroutines.launch
         StudySession::class,
         StudyRecord::class,
         UserStats::class,
-        UserSettings::class
+        UserSettings::class,
+        UnitUnlock::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -41,6 +44,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun studyRecordDao(): StudyRecordDao
     abstract fun userStatsDao(): UserStatsDao
     abstract fun userSettingsDao(): UserSettingsDao
+    abstract fun unitUnlockDao(): UnitUnlockDao
 
     companion object {
         private const val DATABASE_NAME = "english_word_database"
