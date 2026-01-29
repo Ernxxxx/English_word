@@ -278,18 +278,18 @@ fun PremiumScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     PremiumFeatureItem(
-                        text = "レベル無制限",
-                        description = "好きなだけレベルを作成"
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    PremiumFeatureItem(
-                        text = "単語数無制限",
-                        description = "200語の制限を解除"
+                        text = "6,000語以上収録",
+                        description = "中学1年〜高校3年の英単語"
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     PremiumFeatureItem(
                         text = "学習統計グラフ",
                         description = "週間・月間の進捗を可視化"
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    PremiumFeatureItem(
+                        text = "復習リマインダー",
+                        description = "最適なタイミングで通知"
                     )
                 }
             }
