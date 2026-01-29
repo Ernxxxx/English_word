@@ -31,6 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.AlertDialog
@@ -71,7 +73,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
+import android.app.Activity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.englishword.domain.model.Level
@@ -108,6 +112,7 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val listState = rememberLazyListState()
+    val context = LocalContext.current
 
     // Determine if FAB should be expanded
     val isFabExpanded by remember {
@@ -125,6 +130,19 @@ fun HomeScreen(
                 is HomeEvent.NavigateToSettings -> onNavigateToSettings()
                 is HomeEvent.NavigateToPremium -> onNavigateToPremium()
                 is HomeEvent.ShowError -> snackbarHostState.showSnackbar(event.message)
+                is HomeEvent.ShowRewardedAd -> {
+                    val activity = context as? Activity
+                    if (activity != null) {
+                        viewModel.adManager.showRewardedAd(
+                            activity = activity,
+                            onRewarded = { viewModel.onAdWatchedForUnlock(event.levelId) },
+                            onAdDismissed = { /* User cancelled or ad failed */ }
+                        )
+                    }
+                }
+                is HomeEvent.UnitUnlocked -> {
+                    snackbarHostState.showSnackbar("ユニットが3時間アンロックされました")
+                }
             }
         }
     }
@@ -213,7 +231,8 @@ fun HomeScreen(
                         onWordListClick = { viewModel.navigateToWordList(it.level.id) },
                         onDeleteClick = { viewModel.showDeleteDialog(it) },
                         onPremiumClick = onNavigateToPremium,
-                        onParentClick = { viewModel.toggleParentExpansion(it) }
+                        onParentClick = { viewModel.toggleParentExpansion(it) },
+                        onUnlockClick = { viewModel.showUnlockDialog(it) }
                     )
                 }
             }
@@ -252,6 +271,15 @@ fun HomeScreen(
             onConfirm = { viewModel.deleteLevel() }
         )
     }
+
+    // Unit unlock dialog
+    if (uiState.showUnlockDialog && uiState.levelToUnlock != null) {
+        UnlockUnitDialog(
+            onDismiss = { viewModel.hideUnlockDialog() },
+            onWatchAd = { viewModel.requestWatchAdForUnlock() },
+            onPremiumClick = onNavigateToPremium
+        )
+    }
 }
 
 @Composable
@@ -262,7 +290,8 @@ private fun HomeContent(
     onWordListClick: (LevelWithProgress) -> Unit,
     onDeleteClick: (LevelWithProgress) -> Unit,
     onPremiumClick: () -> Unit,
-    onParentClick: (Long) -> Unit = {}
+    onParentClick: (Long) -> Unit = {},
+    onUnlockClick: (Long) -> Unit = {}
 ) {
     LazyColumn(
         state = listState,
@@ -275,7 +304,8 @@ private fun HomeContent(
                 todayStudiedCount = uiState.todayStudiedCount,
                 dailyGoal = uiState.dailyGoal,
                 streak = uiState.streak,
-                isPremium = uiState.isPremium
+                isPremium = uiState.isPremium,
+                remainingReviews = uiState.remainingReviews
             )
         }
 
@@ -302,7 +332,8 @@ private fun HomeContent(
                     ChildLevelCard(
                         levelWithProgress = childLevel,
                         onClick = { onLevelClick(childLevel) },
-                        onWordListClick = { onWordListClick(childLevel) }
+                        onWordListClick = { onWordListClick(childLevel) },
+                        onUnlockClick = { onUnlockClick(childLevel.level.id) }
                     )
                 }
             }
@@ -330,7 +361,8 @@ private fun StatsHeader(
     todayStudiedCount: Int,
     dailyGoal: Int,
     streak: Int,
-    isPremium: Boolean
+    isPremium: Boolean,
+    remainingReviews: Int = Int.MAX_VALUE
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -406,6 +438,39 @@ private fun StatsHeader(
                     color = CorrectGreen,
                     fontWeight = FontWeight.Medium
                 )
+            }
+
+            // Show remaining reviews for free users
+            if (!isPremium && remainingReviews < Int.MAX_VALUE) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (remainingReviews > 0) {
+                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                    } else {
+                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (remainingReviews > 0) {
+                                "本日の残り復習: $remainingReviews/10語"
+                            } else {
+                                "本日の無料復習上限に達しました"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (remainingReviews > 0) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onErrorContainer
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -494,16 +559,29 @@ private fun ParentLevelCard(
 private fun ChildLevelCard(
     levelWithProgress: LevelWithProgress,
     onClick: () -> Unit,
-    onWordListClick: () -> Unit
+    onWordListClick: () -> Unit,
+    onUnlockClick: () -> Unit = {}
 ) {
+    val isLocked = levelWithProgress.isLocked
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 24.dp)
-            .clickable { onClick() },
+            .clickable {
+                if (isLocked) {
+                    onUnlockClick()
+                } else {
+                    onClick()
+                }
+            },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (isLocked) {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
         )
     ) {
         Row(
@@ -512,15 +590,40 @@ private fun ChildLevelCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Lock icon for locked units
+            if (isLocked) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = "Locked",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = levelWithProgress.level.name,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    color = if (isLocked) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "${levelWithProgress.wordCount}語",
+                    text = if (isLocked) {
+                        "${levelWithProgress.wordCount}語 - 広告視聴でアンロック"
+                    } else if (levelWithProgress.remainingUnlockTimeMs > 0) {
+                        val minutes = (levelWithProgress.remainingUnlockTimeMs / 60000).toInt()
+                        val hours = minutes / 60
+                        val mins = minutes % 60
+                        "${levelWithProgress.wordCount}語 - 残り${hours}時間${mins}分"
+                    } else {
+                        "${levelWithProgress.wordCount}語"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -531,7 +634,9 @@ private fun ChildLevelCard(
                 text = "${levelWithProgress.progressPercent}%",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
-                color = if (levelWithProgress.isCompleted) {
+                color = if (isLocked) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else if (levelWithProgress.isCompleted) {
                     CorrectGreen
                 } else {
                     MaterialTheme.colorScheme.primary
@@ -540,12 +645,27 @@ private fun ChildLevelCard(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Word list button
-            TextButton(onClick = onWordListClick) {
-                Text(
-                    text = "単語一覧",
-                    style = MaterialTheme.typography.labelSmall
-                )
+            // Word list button or unlock button
+            if (isLocked) {
+                TextButton(onClick = onUnlockClick) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "広告で解除",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            } else {
+                TextButton(onClick = onWordListClick) {
+                    Text(
+                        text = "単語一覧",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
             }
         }
     }
@@ -819,6 +939,90 @@ private fun DeleteLevelDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun UnlockUnitDialog(
+    onDismiss: () -> Unit,
+    onWatchAd: () -> Unit,
+    onPremiumClick: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "ユニットをアンロック",
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    text = "このユニットは現在ロックされています。"
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "広告を視聴すると3時間アンロックできます。",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = PremiumGold.copy(alpha = 0.1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Star,
+                            contentDescription = null,
+                            tint = PremiumGold,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "プレミアムで全ユニット永久アンロック",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onWatchAd) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("広告を見る")
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onPremiumClick) {
+                    Text(
+                        text = "プレミアム",
+                        color = PremiumGold
+                    )
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("キャンセル")
+                }
             }
         }
     )

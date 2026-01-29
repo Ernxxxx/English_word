@@ -18,7 +18,19 @@ data class LevelWithProgress(
     /**
      * Number of words that have been mastered (reached max SRS level).
      */
-    val masteredCount: Int
+    val masteredCount: Int,
+
+    /**
+     * Whether this level is locked (free tier only).
+     * Premium users always have isLocked = false.
+     */
+    val isLocked: Boolean = false,
+
+    /**
+     * Remaining unlock time in milliseconds (for ad-based unlocks).
+     * 0 means locked or premium user.
+     */
+    val remainingUnlockTimeMs: Long = 0
 ) {
     /**
      * Gets the progress as a fraction (0.0 to 1.0).

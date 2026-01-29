@@ -62,7 +62,22 @@ data class HomeUiState(
     /**
      * Daily goal for words to study.
      */
-    val dailyGoal: Int = 20
+    val dailyGoal: Int = 20,
+
+    /**
+     * Today's review count (for free users).
+     */
+    val todayReviewCount: Int = 0,
+
+    /**
+     * Whether to show the ad unlock dialog.
+     */
+    val showUnlockDialog: Boolean = false,
+
+    /**
+     * The level ID to unlock (when showing unlock dialog).
+     */
+    val levelToUnlock: Long? = null
 ) {
     companion object {
         /**
@@ -107,6 +122,24 @@ data class HomeUiState(
      */
     val totalMasteredCount: Int
         get() = parentLevels.sumOf { it.totalMasteredCount }
+
+    /**
+     * Maximum daily review count for free users.
+     */
+    val freeDailyReviewLimit: Int
+        get() = 10
+
+    /**
+     * Remaining reviews for today (free users).
+     */
+    val remainingReviews: Int
+        get() = if (isPremium) Int.MAX_VALUE else (freeDailyReviewLimit - todayReviewCount).coerceAtLeast(0)
+
+    /**
+     * Whether the user can review more today.
+     */
+    val canReviewMore: Boolean
+        get() = isPremium || todayReviewCount < freeDailyReviewLimit
 }
 
 /**
@@ -118,4 +151,6 @@ sealed class HomeEvent {
     data object NavigateToSettings : HomeEvent()
     data object NavigateToPremium : HomeEvent()
     data class ShowError(val message: String) : HomeEvent()
+    data class ShowRewardedAd(val levelId: Long) : HomeEvent()
+    data class UnitUnlocked(val levelId: Long) : HomeEvent()
 }

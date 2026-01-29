@@ -6,6 +6,7 @@ import com.example.englishword.ads.AdManager
 import com.example.englishword.data.local.entity.Word
 import com.example.englishword.data.repository.SettingsRepository
 import com.example.englishword.data.repository.StudyRepository
+import com.example.englishword.data.repository.UnlockRepository
 import com.example.englishword.data.repository.WordRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +24,7 @@ class StudyViewModel @Inject constructor(
     private val wordRepository: WordRepository,
     private val studyRepository: StudyRepository,
     private val settingsRepository: SettingsRepository, // Added: for premium check
+    private val unlockRepository: UnlockRepository, // Added: for review limits
     val adManager: AdManager // Added: for interstitial ads
 ) : ViewModel() {
 
@@ -134,6 +136,11 @@ class StudyViewModel @Inject constructor(
                 // 覚えた: 次の単語へ
                 knownCount++
 
+                // Increment review count for free users
+                viewModelScope.launch {
+                    unlockRepository.incrementReviewCount()
+                }
+
                 val nextIndex = currentState.currentIndex + 1
 
                 if (nextIndex < currentState.words.size) {
@@ -228,5 +235,23 @@ class StudyViewModel @Inject constructor(
      */
     fun preloadInterstitialAd() {
         adManager.loadInterstitialAd()
+    }
+
+    // ==================== Review Limit Methods ====================
+
+    /**
+     * Check if the user can review more today.
+     */
+    suspend fun canReviewMore(): Boolean {
+        val isPremium = settingsRepository.isPremiumSync()
+        return unlockRepository.canReviewMore(isPremium)
+    }
+
+    /**
+     * Get remaining reviews for today.
+     */
+    suspend fun getRemainingReviews(): Int {
+        val isPremium = settingsRepository.isPremiumSync()
+        return unlockRepository.getRemainingReviews(isPremium)
     }
 }
