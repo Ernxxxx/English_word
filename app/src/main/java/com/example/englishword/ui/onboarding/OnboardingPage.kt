@@ -68,8 +68,8 @@ object OnboardingPages {
     val pages = listOf(
         OnboardingPageData(
             icon = Icons.Default.School,
-            title = "レベル別に学習",
-            description = "基礎・標準・上級の3つのレベルから\nあなたに合ったレベルを選んで\n効率的に英単語を学習できます",
+            title = "学年別に学習",
+            description = "中学1年〜高校3年まで\n6,000語以上の英単語を収録\nあなたの学年に合わせて学習できます",
             primaryColor = Blue40,
             secondaryColor = Blue80
         ),
