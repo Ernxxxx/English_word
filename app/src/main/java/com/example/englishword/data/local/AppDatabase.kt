@@ -12,6 +12,7 @@ import com.example.englishword.data.local.dao.UnitUnlockDao
 import com.example.englishword.data.local.dao.UserSettingsDao
 import com.example.englishword.data.local.dao.UserStatsDao
 import com.example.englishword.data.local.dao.WordDao
+import com.example.englishword.data.local.migration.Migrations
 import com.example.englishword.data.local.entity.Level
 import com.example.englishword.data.local.entity.StudyRecord
 import com.example.englishword.data.local.entity.StudySession
@@ -65,7 +66,7 @@ abstract class AppDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .addCallback(DatabaseCallback())
-                .fallbackToDestructiveMigration()
+                .addMigrations(*Migrations.getAllMigrations())
                 .build()
         }
 
