@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -88,11 +91,12 @@ fun StreakBadge(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(size.spacing)
         ) {
-            // Fire emoji
-            Text(
-                text = if (isActive) "\uD83D\uDD25" else "\uD83D\uDD25",
-                fontSize = size.emojiSize,
-                modifier = Modifier.padding(end = 2.dp)
+            // Fire icon
+            Icon(
+                imageVector = Icons.Filled.Whatshot,
+                contentDescription = "Streak",
+                tint = if (isActive) StreakOrange else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(size.emojiSize.value.dp)
             )
 
             // Streak count
@@ -152,9 +156,11 @@ fun StreakBadgeJapanese(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = "\uD83D\uDD25",
-                fontSize = 18.sp
+            Icon(
+                imageVector = Icons.Filled.Whatshot,
+                contentDescription = "Streak",
+                tint = if (isActive) StreakOrange else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
             )
             Text(
                 text = "連続 ${streak}日目",
@@ -207,9 +213,11 @@ fun StreakDisplay(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = "\uD83D\uDD25",
-                fontSize = 28.sp
+            Icon(
+                imageVector = Icons.Filled.Whatshot,
+                contentDescription = "Streak",
+                tint = if (isActive) StreakOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(28.dp)
             )
             Text(
                 text = streak.toString(),
