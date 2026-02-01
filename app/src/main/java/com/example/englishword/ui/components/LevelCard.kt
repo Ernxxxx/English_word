@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.List
@@ -82,8 +83,7 @@ fun LevelCard(
         label = "progress_animation"
     )
 
-    // Get icon based on level index
-    val icon = getLevelIcon(levelWithProgress.level.displayOrder)
+    // Use Material Icon instead of emoji
 
     // Determine progress color
     val progressColor by animateColorAsState(
@@ -134,9 +134,11 @@ fun LevelCard(
                     Box(
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = icon,
-                            fontSize = 24.sp
+                        Icon(
+                            imageVector = Icons.Default.MenuBook,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = progressColor
                         )
                     }
                 }
@@ -293,24 +295,6 @@ fun LevelCard(
     }
 }
 
-/**
- * Get an icon for a level based on its index.
- */
-private fun getLevelIcon(index: Int): String {
-    val icons = listOf(
-        "\uD83D\uDCD8", // Green book
-        "\uD83D\uDCD7", // Orange book
-        "\uD83D\uDCD9", // Blue book
-        "\uD83D\uDCDA", // Books
-        "\uD83D\uDCD3", // Notebook
-        "\uD83D\uDCD5", // Closed book
-        "\uD83D\uDCD6", // Open book
-        "\uD83D\uDCDD", // Memo
-        "\u2728",       // Sparkles
-        "\uD83C\uDF1F"  // Star
-    )
-    return icons[index % icons.size]
-}
 
 /**
  * A compact version of the level card for smaller displays.
@@ -321,8 +305,6 @@ fun LevelCardCompact(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val icon = getLevelIcon(levelWithProgress.level.displayOrder)
-
     val progressColor by animateColorAsState(
         targetValue = when {
             levelWithProgress.isCompleted -> CorrectGreen
@@ -345,9 +327,11 @@ fun LevelCardCompact(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = icon,
-                fontSize = 20.sp
+            Icon(
+                imageVector = Icons.Default.MenuBook,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = progressColor
             )
 
             Spacer(modifier = Modifier.width(8.dp))
