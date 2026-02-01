@@ -1,13 +1,18 @@
 package com.example.englishword
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import com.example.englishword.ads.AdManager
 import com.example.englishword.ads.InterstitialAdManager
 import com.example.englishword.data.local.InitialDataSeeder
+import com.example.englishword.data.repository.SettingsRepository
+import com.example.englishword.notification.NotificationScheduler
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -16,7 +21,7 @@ import javax.inject.Inject
  * Annotated with @HiltAndroidApp to enable Hilt dependency injection.
  */
 @HiltAndroidApp
-class EnglishWordApp : Application() {
+class EnglishWordApp : Application(), Configuration.Provider {
 
     @Inject
     lateinit var initialDataSeeder: InitialDataSeeder
@@ -27,7 +32,21 @@ class EnglishWordApp : Application() {
     @Inject
     lateinit var interstitialAdManager: InterstitialAdManager
 
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
+
+    @Inject
+    lateinit var notificationScheduler: NotificationScheduler
+
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
 
     override fun onCreate() {
         super.onCreate()
@@ -42,5 +61,22 @@ class EnglishWordApp : Application() {
 
         // Pre-load interstitial ad
         interstitialAdManager.loadAd()
+
+        // Initialize notifications based on saved settings
+        applicationScope.launch {
+            initializeNotifications()
+        }
+    }
+
+    private suspend fun initializeNotifications() {
+        try {
+            val isEnabled = settingsRepository.isNotificationEnabled().first()
+            if (isEnabled) {
+                val time = settingsRepository.getNotificationTime().first()
+                notificationScheduler.scheduleFromTimeString(time)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
