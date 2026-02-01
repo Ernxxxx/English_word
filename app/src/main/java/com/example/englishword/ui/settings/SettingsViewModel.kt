@@ -3,6 +3,7 @@ package com.example.englishword.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.englishword.data.repository.SettingsRepository
+import com.example.englishword.notification.NotificationScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -54,7 +55,8 @@ sealed class SettingsEvent {
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val notificationScheduler: NotificationScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -149,7 +151,15 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val success = settingsRepository.setNotificationEnabled(enabled)
-                if (!success) {
+                if (success) {
+                    // Schedule or cancel notifications based on setting
+                    if (enabled) {
+                        val time = _uiState.value.notificationTime
+                        notificationScheduler.scheduleFromTimeString(time)
+                    } else {
+                        notificationScheduler.cancelDailyReminder()
+                    }
+                } else {
                     _uiState.update { it.copy(error = "保存に失敗しました") }
                 }
             } catch (e: Exception) {
@@ -162,7 +172,12 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val success = settingsRepository.setNotificationTime(time)
-                if (!success) {
+                if (success) {
+                    // Reschedule notification with new time if enabled
+                    if (_uiState.value.isNotificationEnabled) {
+                        notificationScheduler.scheduleFromTimeString(time)
+                    }
+                } else {
                     _uiState.update { it.copy(error = "保存に失敗しました") }
                 }
             } catch (e: Exception) {

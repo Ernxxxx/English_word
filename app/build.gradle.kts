@@ -106,6 +106,11 @@ dependencies {
     // AdMob (Google Mobile Ads)
     implementation(libs.play.services.ads)
 
+    // WorkManager for scheduled notifications
+    implementation(libs.work.runtime.ktx)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.work.compiler)
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
