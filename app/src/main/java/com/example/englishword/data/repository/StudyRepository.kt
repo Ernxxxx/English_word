@@ -7,6 +7,7 @@ import com.example.englishword.data.local.dao.WordDao
 import com.example.englishword.data.local.entity.StudyRecord
 import com.example.englishword.data.local.entity.StudySession
 import com.example.englishword.data.local.entity.UserStats
+import com.example.englishword.util.SrsCalculator
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -275,54 +276,25 @@ class StudyRepository @Inject constructor(
 
     /**
      * Update word mastery based on study result.
-     * Uses a simplified SM-2 spaced repetition algorithm.
+     * Delegates to SrsCalculator for consistent SRS logic across the app.
+     *
+     * @param wordId The ID of the word to update
+     * @param result The review result (0=AGAIN, 1=LATER, 2=KNOWN)
      */
     private suspend fun updateWordMastery(wordId: Long, result: Int) {
         val word = wordDao.getWordByIdSync(wordId) ?: return
 
-        val newMasteryLevel = when (result) {
-            0 -> maxOf(0, word.masteryLevel - 2) // Forgot: decrease by 2
-            1 -> maxOf(0, word.masteryLevel - 1) // Hard: decrease by 1
-            2 -> minOf(5, word.masteryLevel + 1) // Easy: increase by 1
-            else -> word.masteryLevel
-        }
-
-        val nextReviewAt = calculateNextReviewTime(newMasteryLevel, result)
+        // Use centralized SRS calculator for consistent mastery updates
+        val (newMasteryLevel, nextReviewAt) = SrsCalculator.calculateNextReview(
+            currentLevel = word.masteryLevel,
+            result = result
+        )
 
         wordDao.updateMastery(
             wordId = wordId,
             masteryLevel = newMasteryLevel,
             nextReviewAt = nextReviewAt
         )
-    }
-
-    /**
-     * Calculate next review time based on mastery level and result.
-     */
-    private fun calculateNextReviewTime(masteryLevel: Int, result: Int): Long {
-        val now = System.currentTimeMillis()
-
-        // Base intervals in minutes for each mastery level
-        val baseIntervalMinutes = when (masteryLevel) {
-            0 -> 1L           // 1 minute
-            1 -> 10L          // 10 minutes
-            2 -> 60L          // 1 hour
-            3 -> 24 * 60L     // 1 day
-            4 -> 3 * 24 * 60L // 3 days
-            5 -> 7 * 24 * 60L // 7 days (mastered)
-            else -> 7 * 24 * 60L
-        }
-
-        // Adjust interval based on result
-        val multiplier = when (result) {
-            0 -> 0.25  // Forgot: very short interval
-            1 -> 0.5   // Hard: shorter interval
-            2 -> 1.0   // Easy: normal interval
-            else -> 1.0
-        }
-
-        val intervalMs = (baseIntervalMinutes * multiplier * 60 * 1000).toLong()
-        return now + intervalMs
     }
 
     /**

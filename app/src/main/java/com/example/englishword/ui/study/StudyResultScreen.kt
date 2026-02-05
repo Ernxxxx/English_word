@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.englishword.ads.AdManager
+import com.example.englishword.ui.components.BannerAdView
 import com.example.englishword.ui.theme.CorrectGreen
 import com.example.englishword.ui.theme.EnglishWordTheme
 import com.example.englishword.ui.theme.IncorrectRed
@@ -79,6 +80,7 @@ fun StudyResultScreen(
     viewModel: StudyViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isPremium by viewModel.adManager.isPremium.collectAsState()
     val context = LocalContext.current
     val activity = context as? Activity
 
@@ -101,6 +103,7 @@ fun StudyResultScreen(
 
             StudyResultContent(
                 state = state,
+                isPremium = isPremium,
                 onNavigateToHome = onNavigateToHome,
                 onRetry = { onNavigateToStudy(state.levelId) },
                 modifier = modifier
@@ -124,6 +127,7 @@ fun StudyResultScreen(
 @Composable
 fun StudyResultContent(
     state: StudyUiState.Completed,
+    isPremium: Boolean = false,
     onNavigateToHome: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
@@ -136,7 +140,17 @@ fun StudyResultContent(
     }
 
     Scaffold(
-        modifier = modifier
+        modifier = modifier,
+        bottomBar = {
+            // Banner ad at bottom (hidden for premium users)
+            if (!isPremium) {
+                BannerAdView(
+                    adUnitId = AdManager.BANNER_AD_UNIT_ID,
+                    isPremium = isPremium,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
     ) { paddingValues ->
         Box(
             modifier = Modifier

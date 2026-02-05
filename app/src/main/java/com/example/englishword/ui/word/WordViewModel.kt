@@ -26,6 +26,7 @@ import javax.inject.Inject
 class WordListViewModel @Inject constructor(
     private val wordRepository: WordRepository,
     private val levelRepository: LevelRepository,
+    private val settingsRepository: SettingsRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -36,6 +37,15 @@ class WordListViewModel @Inject constructor(
 
     init {
         loadData()
+        loadPremiumStatus()
+    }
+
+    private fun loadPremiumStatus() {
+        viewModelScope.launch {
+            settingsRepository.isPremium().collect { isPremium ->
+                _uiState.update { it.copy(isPremium = isPremium) }
+            }
+        }
     }
 
     private fun loadData() {
