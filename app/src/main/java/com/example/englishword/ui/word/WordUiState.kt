@@ -12,7 +12,8 @@ data class WordListUiState(
     val level: Level? = null,
     val searchQuery: String = "",
     val isLoading: Boolean = true,
-    val error: String? = null
+    val error: String? = null,
+    val isPremium: Boolean = false
 )
 
 /**

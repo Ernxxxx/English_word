@@ -30,11 +30,20 @@ class PremiumManager @Inject constructor(
     // ==================== Premium State ====================
 
     /**
-     * Combined premium status from billing and local settings.
+     * Combined premium status from billing, local settings, and trial.
      * This is the single source of truth for premium status.
      */
     private val _isPremium = MutableStateFlow(false)
     val isPremium: StateFlow<Boolean> = _isPremium.asStateFlow()
+
+    /**
+     * Trial state information.
+     */
+    private val _trialDaysRemaining = MutableStateFlow(0)
+    val trialDaysRemaining: StateFlow<Int> = _trialDaysRemaining.asStateFlow()
+
+    private val _isTrialActive = MutableStateFlow(false)
+    val isTrialActive: StateFlow<Boolean> = _isTrialActive.asStateFlow()
 
     /**
      * Loading state for premium check operations.
@@ -54,14 +63,19 @@ class PremiumManager @Inject constructor(
     val purchaseState: StateFlow<BillingRepository.PurchaseState> = billingRepository.purchaseState
 
     init {
-        // Initialize premium status from local settings first (fast)
+        // Initialize premium status from local settings and trial
         applicationScope.launch {
             settingsRepository.isPremium().collect { localPremium ->
                 // Only update if we're not currently loading from Google Play
                 if (!_isLoading.value) {
-                    _isPremium.value = localPremium
+                    updatePremiumStatus(localPremium)
                 }
             }
+        }
+
+        // Check and update trial status on startup
+        applicationScope.launch {
+            refreshTrialStatus()
         }
 
         // Sync with Google Play when billing connects
@@ -222,6 +236,59 @@ class PremiumManager @Inject constructor(
             // Already not premium, no action needed
             _isPremium.value = false
         }
+    }
+
+    /**
+     * Update combined premium status (paid + trial).
+     */
+    private suspend fun updatePremiumStatus(paidPremium: Boolean) {
+        val trialActive = settingsRepository.isTrialActive()
+        _isPremium.value = paidPremium || trialActive
+    }
+
+    // ==================== Trial Management ====================
+
+    /**
+     * Start a free trial for new users.
+     * @return true if trial was started successfully
+     */
+    suspend fun startTrial(): Boolean {
+        val result = settingsRepository.startTrial()
+        if (result) {
+            Log.d(TAG, "Free trial started")
+            refreshTrialStatus()
+        }
+        return result
+    }
+
+    /**
+     * Refresh trial status and update state flows.
+     */
+    suspend fun refreshTrialStatus() {
+        _isTrialActive.value = settingsRepository.isTrialActive()
+        _trialDaysRemaining.value = settingsRepository.getTrialDaysRemaining()
+
+        // Update combined premium status
+        val paidPremium = settingsRepository.isPremiumSync()
+        updatePremiumStatus(paidPremium)
+
+        if (_isTrialActive.value) {
+            Log.d(TAG, "Trial active: ${_trialDaysRemaining.value} days remaining")
+        }
+    }
+
+    /**
+     * Check if trial has expired (for showing upgrade prompts).
+     */
+    suspend fun isTrialExpired(): Boolean {
+        return settingsRepository.isTrialExpired()
+    }
+
+    /**
+     * Check if user has premium access (paid or trial).
+     */
+    suspend fun hasPremiumAccess(): Boolean {
+        return settingsRepository.hasPremiumAccess()
     }
 
     // ==================== Product Information ====================

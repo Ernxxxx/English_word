@@ -38,6 +38,11 @@ class SettingsRepository @Inject constructor(
         const val KEY_PREMIUM_EXPIRES_AT = "premium_expires_at"
         const val KEY_PREMIUM_SKU = "premium_sku"
 
+        // Trial Settings
+        const val KEY_TRIAL_STARTED_AT = "trial_started_at"
+        const val KEY_TRIAL_EXPIRES_AT = "trial_expires_at"
+        const val TRIAL_DURATION_DAYS = 7L
+
         // Onboarding Settings
         const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         const val KEY_FIRST_LAUNCH = "first_launch"
@@ -409,6 +414,90 @@ class SettingsRepository @Inject constructor(
         } catch (e: Exception) {
             false
         }
+    }
+
+    // ==================== Trial Management ====================
+
+    /**
+     * Start a free trial. Should be called on first launch.
+     * @return true if trial was started successfully
+     */
+    suspend fun startTrial(): Boolean {
+        // Don't start trial if already started or if user is premium
+        if (isTrialStarted() || isPremiumSync()) {
+            return false
+        }
+
+        return try {
+            val now = System.currentTimeMillis()
+            val expiresAt = now + (TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000)
+
+            setLongValue(KEY_TRIAL_STARTED_AT, now)
+            setLongValue(KEY_TRIAL_EXPIRES_AT, expiresAt)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Check if trial has been started.
+     * Uses 0L as sentinel value to indicate "never started".
+     */
+    suspend fun isTrialStarted(): Boolean {
+        return getLongValueSync(KEY_TRIAL_STARTED_AT, 0L) > 0L
+    }
+
+    /**
+     * Check if trial is currently active (started and not expired).
+     * Uses 0L as sentinel value to indicate "not set".
+     */
+    suspend fun isTrialActive(): Boolean {
+        val expiresAt = getLongValueSync(KEY_TRIAL_EXPIRES_AT, 0L)
+        if (expiresAt == 0L) return false
+        return System.currentTimeMillis() < expiresAt
+    }
+
+    /**
+     * Get trial expiration timestamp.
+     * @return Expiration timestamp, or null if trial not started
+     */
+    suspend fun getTrialExpiresAt(): Long? {
+        val expiresAt = getLongValueSync(KEY_TRIAL_EXPIRES_AT, 0L)
+        return if (expiresAt > 0L) expiresAt else null
+    }
+
+    /**
+     * Get remaining trial days.
+     * @return Number of days remaining, or 0 if trial expired/not started
+     */
+    suspend fun getTrialDaysRemaining(): Int {
+        val expiresAt = getLongValueSync(KEY_TRIAL_EXPIRES_AT, 0L)
+        if (expiresAt == 0L) return 0
+        val remaining = expiresAt - System.currentTimeMillis()
+        if (remaining <= 0) return 0
+        return (remaining / (24 * 60 * 60 * 1000)).toInt() + 1 // Round up
+    }
+
+    /**
+     * Check if trial has expired.
+     * Returns false if trial was never started.
+     */
+    suspend fun isTrialExpired(): Boolean {
+        val expiresAt = getLongValueSync(KEY_TRIAL_EXPIRES_AT, 0L)
+        if (expiresAt == 0L) return false // Never started = not expired
+        return System.currentTimeMillis() >= expiresAt
+    }
+
+    /**
+     * Check if user has premium access (paid or trial).
+     * This is the primary method to check for premium features.
+     */
+    suspend fun hasPremiumAccess(): Boolean {
+        // Check paid premium first
+        if (isPremiumSync()) return true
+        // Then check active trial
+        return isTrialActive()
     }
 
     // ==================== Onboarding ====================

@@ -41,7 +41,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.englishword.ads.AdManager
 import com.example.englishword.data.local.entity.Word
+import com.example.englishword.ui.components.BannerAdView
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +76,16 @@ fun WordListScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
+        },
+        bottomBar = {
+            // Banner ad at bottom (hidden for premium users)
+            if (!uiState.isPremium) {
+                BannerAdView(
+                    adUnitId = AdManager.BANNER_AD_UNIT_ID,
+                    isPremium = uiState.isPremium,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     ) { paddingValues ->
         Column(

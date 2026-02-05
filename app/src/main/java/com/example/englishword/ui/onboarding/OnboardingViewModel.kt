@@ -2,6 +2,7 @@ package com.example.englishword.ui.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.englishword.billing.PremiumManager
 import com.example.englishword.data.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +28,8 @@ data class OnboardingUiState(
  */
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val premiumManager: PremiumManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
@@ -90,7 +92,7 @@ class OnboardingViewModel @Inject constructor(
     }
 
     /**
-     * Complete onboarding, save the flag, and trigger navigation to home
+     * Complete onboarding, save the flag, start trial, and trigger navigation to home
      */
     fun completeOnboarding() {
         viewModelScope.launch {
@@ -100,6 +102,9 @@ class OnboardingViewModel @Inject constructor(
 
                 // Mark first launch as completed
                 settingsRepository.markAppLaunched()
+
+                // Start 7-day free trial for new users
+                premiumManager.startTrial()
 
                 // Trigger navigation to home
                 _uiState.value = _uiState.value.copy(shouldNavigateToHome = true)
