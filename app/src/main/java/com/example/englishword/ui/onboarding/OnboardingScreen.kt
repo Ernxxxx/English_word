@@ -69,18 +69,20 @@ fun OnboardingScreen(
         }
     }
 
-    // Sync pager state with ViewModel
+    // Sync pager state with ViewModel (user swipe -> ViewModel)
+    // Use settledPage to avoid triggering during animation
     LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage }
+        snapshotFlow { pagerState.settledPage }
             .distinctUntilChanged()
             .collect { page ->
                 viewModel.goToPage(page)
             }
     }
 
-    // Sync ViewModel state with pager
+    // Sync ViewModel state with pager (programmatic navigation -> Pager)
+    // Compare with settledPage to prevent sync loop during animation
     LaunchedEffect(uiState.currentPage) {
-        if (pagerState.currentPage != uiState.currentPage) {
+        if (pagerState.settledPage != uiState.currentPage) {
             pagerState.animateScrollToPage(uiState.currentPage)
         }
     }

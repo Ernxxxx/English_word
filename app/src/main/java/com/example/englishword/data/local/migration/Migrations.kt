@@ -10,6 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * - Version 1: Initial release with levels, words, study_sessions, study_records, user_stats, user_settings
  * - Version 2: No schema changes (app updates)
  * - Version 3: Added unit_unlocks table for free tier monetization
+ * - Version 4: Added session progress fields to study_sessions for session recovery
  */
 object Migrations {
 
@@ -60,13 +61,55 @@ object Migrations {
     }
 
     /**
+     * Migration from version 3 to 4.
+     * Adds session progress fields to study_sessions for session recovery.
+     */
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // Add progress tracking columns to study_sessions
+            database.execSQL("ALTER TABLE study_sessions ADD COLUMN currentIndex INTEGER NOT NULL DEFAULT 0")
+            database.execSQL("ALTER TABLE study_sessions ADD COLUMN knownCount INTEGER NOT NULL DEFAULT 0")
+            database.execSQL("ALTER TABLE study_sessions ADD COLUMN againCount INTEGER NOT NULL DEFAULT 0")
+            database.execSQL("ALTER TABLE study_sessions ADD COLUMN laterCount INTEGER NOT NULL DEFAULT 0")
+            database.execSQL("ALTER TABLE study_sessions ADD COLUMN wordIds TEXT NOT NULL DEFAULT ''")
+            database.execSQL("ALTER TABLE study_sessions ADD COLUMN laterQueueIds TEXT NOT NULL DEFAULT ''")
+            database.execSQL("ALTER TABLE study_sessions ADD COLUMN isReversed INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+    /**
+     * Migration from version 1 to 4 (skip versions 2, 3).
+     * Combines all changes for users upgrading from initial release.
+     */
+    val MIGRATION_1_4 = object : Migration(1, 4) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_1_2.migrate(database)
+            MIGRATION_2_3.migrate(database)
+            MIGRATION_3_4.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 2 to 4 (skip version 3).
+     */
+    val MIGRATION_2_4 = object : Migration(2, 4) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_2_3.migrate(database)
+            MIGRATION_3_4.migrate(database)
+        }
+    }
+
+    /**
      * Get all migrations for the database builder.
      */
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
-            MIGRATION_1_3
+            MIGRATION_1_3,
+            MIGRATION_3_4,
+            MIGRATION_1_4,
+            MIGRATION_2_4
         )
     }
 }

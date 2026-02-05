@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
         UserSettings::class,
         UnitUnlock::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

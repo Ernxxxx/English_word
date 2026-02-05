@@ -3,6 +3,7 @@ package com.example.englishword.ui.study
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.englishword.ads.AdManager
+import com.example.englishword.data.local.entity.StudySession
 import com.example.englishword.data.local.entity.Word
 import com.example.englishword.data.repository.SettingsRepository
 import com.example.englishword.data.repository.StudyRepository
@@ -39,6 +40,7 @@ class StudyViewModel @Inject constructor(
 
     /**
      * Load words for study from the specified level.
+     * First checks for an incomplete session to resume.
      */
     fun loadWords(levelId: Long) {
         currentLevelId = levelId
@@ -46,41 +48,96 @@ class StudyViewModel @Inject constructor(
             _uiState.value = StudyUiState.Loading
 
             try {
-                val words = wordRepository.getWordsForReview(levelId, limit = 20)
+                // Check for incomplete session to resume
+                val incompleteSession = studyRepository.getIncompleteSessionForLevel(levelId)
 
-                if (words.isEmpty()) {
-                    _uiState.value = StudyUiState.Error("No words available for study")
+                if (incompleteSession != null && incompleteSession.isInProgress) {
+                    // Resume incomplete session
+                    resumeSession(incompleteSession)
                     return@launch
                 }
 
-                // Start a new study session
-                val sessionId = studyRepository.startSession(levelId)
-
-                if (sessionId == -1L) {
-                    _uiState.value = StudyUiState.Error("Failed to start study session")
-                    return@launch
-                }
-
-                // Reset counters
-                knownCount = 0
-                againCount = 0
-                laterCount = 0
-
-                // 設定から出題方向を取得
-                val isReversed = settingsRepository.isStudyDirectionReversedSync()
-
-                _uiState.value = StudyUiState.Studying(
-                    words = words,
-                    currentIndex = 0,
-                    isFlipped = false,
-                    sessionId = sessionId,
-                    laterQueue = emptyList(),
-                    isReversed = isReversed
-                )
+                // Start fresh session
+                startNewSession(levelId)
             } catch (e: Exception) {
                 _uiState.value = StudyUiState.Error("Failed to load words: ${e.message}")
             }
         }
+    }
+
+    /**
+     * Resume an incomplete session.
+     */
+    private suspend fun resumeSession(session: StudySession) {
+        val wordIds = session.getWordIdList()
+        val laterQueueIds = session.getLaterQueueIdList()
+
+        // Load words from database
+        val words = wordRepository.getWordsByIds(wordIds)
+        val laterQueue = if (laterQueueIds.isNotEmpty()) {
+            wordRepository.getWordsByIds(laterQueueIds)
+        } else {
+            emptyList()
+        }
+
+        if (words.isEmpty()) {
+            // Session data corrupted, start fresh
+            studyRepository.deleteSession(session.id)
+            startNewSession(session.levelId)
+            return
+        }
+
+        // Restore counters
+        knownCount = session.knownCount
+        againCount = session.againCount
+        laterCount = session.laterCount
+
+        _uiState.value = StudyUiState.Studying(
+            words = words,
+            currentIndex = session.currentIndex.coerceAtMost(words.size - 1),
+            isFlipped = false,
+            sessionId = session.id,
+            laterQueue = laterQueue,
+            isReversed = session.isReversed
+        )
+    }
+
+    /**
+     * Start a new study session.
+     */
+    private suspend fun startNewSession(levelId: Long) {
+        val words = wordRepository.getWordsForReview(levelId, limit = 20)
+
+        if (words.isEmpty()) {
+            _uiState.value = StudyUiState.Error("No words available for study")
+            return
+        }
+
+        // 設定から出題方向を取得
+        val isReversed = settingsRepository.isStudyDirectionReversedSync()
+
+        // Start a new session with progress data
+        val wordIds = words.map { it.id }
+        val sessionId = studyRepository.startSessionWithProgress(levelId, wordIds, isReversed)
+
+        if (sessionId == -1L) {
+            _uiState.value = StudyUiState.Error("Failed to start study session")
+            return
+        }
+
+        // Reset counters
+        knownCount = 0
+        againCount = 0
+        laterCount = 0
+
+        _uiState.value = StudyUiState.Studying(
+            words = words,
+            currentIndex = 0,
+            isFlipped = false,
+            sessionId = sessionId,
+            laterQueue = emptyList(),
+            isReversed = isReversed
+        )
     }
 
     /**
@@ -122,15 +179,21 @@ class StudyViewModel @Inject constructor(
                 againCount++
                 _uiState.value = currentState.copy(isFlipped = false)
 
-                // Record to database
+                // Record to database and save progress
                 viewModelScope.launch {
                     studyRepository.recordResult(sessionId, currentWord.id, 0)
+                    saveProgress(currentState)
                 }
             }
             EvaluationResult.LATER -> {
                 // 使わない（互換性のために残す）
                 laterCount++
                 _uiState.value = currentState.copy(isFlipped = false)
+
+                // Save progress
+                viewModelScope.launch {
+                    saveProgress(currentState)
+                }
             }
             EvaluationResult.KNOWN -> {
                 // 覚えた: 次の単語へ
@@ -144,10 +207,17 @@ class StudyViewModel @Inject constructor(
                 val nextIndex = currentState.currentIndex + 1
 
                 if (nextIndex < currentState.words.size) {
-                    _uiState.value = currentState.copy(
+                    val newState = currentState.copy(
                         currentIndex = nextIndex,
                         isFlipped = false
                     )
+                    _uiState.value = newState
+
+                    // Save progress after moving to next word
+                    viewModelScope.launch {
+                        studyRepository.recordResult(sessionId, currentWord.id, 2)
+                        saveProgress(newState)
+                    }
                 } else {
                     // 全単語完了
                     _uiState.value = StudyUiState.Completed(
@@ -160,8 +230,9 @@ class StudyViewModel @Inject constructor(
                         streak = 0
                     )
 
-                    // Complete session
+                    // Complete session (clears progress data)
                     viewModelScope.launch {
+                        studyRepository.recordResult(sessionId, currentWord.id, 2)
                         studyRepository.completeSession(sessionId, knownCount + againCount, knownCount)
                         val streak = studyRepository.getCurrentStreak()
                         val completedState = _uiState.value
@@ -170,13 +241,24 @@ class StudyViewModel @Inject constructor(
                         }
                     }
                 }
-
-                // Record to database
-                viewModelScope.launch {
-                    studyRepository.recordResult(sessionId, currentWord.id, 2)
-                }
             }
         }
+    }
+
+    /**
+     * Save current session progress to database.
+     */
+    private suspend fun saveProgress(state: StudyUiState.Studying) {
+        studyRepository.saveSessionProgress(
+            sessionId = state.sessionId,
+            currentIndex = state.currentIndex,
+            knownCount = knownCount,
+            againCount = againCount,
+            laterCount = laterCount,
+            wordIds = state.words.map { it.id },
+            laterQueueIds = state.laterQueue.map { it.id },
+            isReversed = state.isReversed
+        )
     }
 
     /**
@@ -191,19 +273,28 @@ class StudyViewModel @Inject constructor(
         val newLaterQueue = currentState.laterQueue + currentWord
         val nextIndex = currentState.currentIndex + 1
 
-        if (nextIndex < currentState.words.size) {
-            _uiState.value = currentState.copy(
+        val newState = if (nextIndex < currentState.words.size) {
+            currentState.copy(
                 currentIndex = nextIndex,
                 isFlipped = false,
                 laterQueue = newLaterQueue
             )
         } else if (newLaterQueue.isNotEmpty()) {
-            _uiState.value = currentState.copy(
+            currentState.copy(
                 words = newLaterQueue,
                 currentIndex = 0,
                 isFlipped = false,
                 laterQueue = emptyList()
             )
+        } else {
+            return
+        }
+
+        _uiState.value = newState
+
+        // Save progress after skipping
+        viewModelScope.launch {
+            saveProgress(newState)
         }
     }
 
