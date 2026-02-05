@@ -27,6 +27,10 @@ interface WordDao {
     @Query("SELECT * FROM words WHERE id = :id")
     suspend fun getWordByIdSync(id: Long): Word?
 
+    // Get multiple words by IDs (for session recovery)
+    @Query("SELECT * FROM words WHERE id IN (:ids)")
+    suspend fun getWordsByIds(ids: List<Long>): List<Word>
+
     @Query("SELECT * FROM words WHERE english = :english LIMIT 1")
     suspend fun getWordByEnglish(english: String): Word?
 

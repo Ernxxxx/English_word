@@ -86,4 +86,40 @@ interface StudySessionDao {
 
     @Query("SELECT SUM(masteredCount) FROM study_sessions WHERE completedAt IS NOT NULL")
     fun getTotalWordsMastered(): Flow<Int?>
+
+    // Session progress persistence
+    @Query("""
+        UPDATE study_sessions
+        SET currentIndex = :currentIndex,
+            knownCount = :knownCount,
+            againCount = :againCount,
+            laterCount = :laterCount,
+            wordIds = :wordIds,
+            laterQueueIds = :laterQueueIds,
+            isReversed = :isReversed
+        WHERE id = :sessionId
+    """)
+    suspend fun updateSessionProgress(
+        sessionId: Long,
+        currentIndex: Int,
+        knownCount: Int,
+        againCount: Int,
+        laterCount: Int,
+        wordIds: String,
+        laterQueueIds: String,
+        isReversed: Boolean
+    )
+
+    // Get most recent incomplete session for a level
+    @Query("""
+        SELECT * FROM study_sessions
+        WHERE levelId = :levelId AND completedAt IS NULL AND wordIds != ''
+        ORDER BY startedAt DESC
+        LIMIT 1
+    """)
+    suspend fun getIncompleteSessionForLevel(levelId: Long): StudySession?
+
+    // Delete incomplete sessions older than given timestamp
+    @Query("DELETE FROM study_sessions WHERE completedAt IS NULL AND startedAt < :beforeTime")
+    suspend fun deleteOldIncompleteSessions(beforeTime: Long)
 }

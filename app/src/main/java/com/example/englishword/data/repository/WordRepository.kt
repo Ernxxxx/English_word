@@ -61,6 +61,22 @@ class WordRepository @Inject constructor(
     }
 
     /**
+     * Get multiple words by their IDs.
+     * Preserves the order of input IDs in the result.
+     */
+    suspend fun getWordsByIds(wordIds: List<Long>): List<Word> {
+        if (wordIds.isEmpty()) return emptyList()
+        return try {
+            val words = wordDao.getWordsByIds(wordIds)
+            // Preserve original order
+            val wordMap = words.associateBy { it.id }
+            wordIds.mapNotNull { wordMap[it] }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
      * Search words by English or Japanese text.
      */
     fun searchWords(query: String): Flow<List<Word>> {

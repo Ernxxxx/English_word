@@ -158,6 +158,87 @@ class StudyRepository @Inject constructor(
         }
     }
 
+    // ==================== Session Progress Persistence ====================
+
+    /**
+     * Save session progress for later recovery.
+     * Call this periodically during study to prevent data loss.
+     */
+    suspend fun saveSessionProgress(
+        sessionId: Long,
+        currentIndex: Int,
+        knownCount: Int,
+        againCount: Int,
+        laterCount: Int,
+        wordIds: List<Long>,
+        laterQueueIds: List<Long>,
+        isReversed: Boolean
+    ): Boolean {
+        return try {
+            studySessionDao.updateSessionProgress(
+                sessionId = sessionId,
+                currentIndex = currentIndex,
+                knownCount = knownCount,
+                againCount = againCount,
+                laterCount = laterCount,
+                wordIds = StudySession.wordIdsToString(wordIds),
+                laterQueueIds = StudySession.wordIdsToString(laterQueueIds),
+                isReversed = isReversed
+            )
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Get an incomplete (in-progress) session for a level.
+     * Returns null if no incomplete session exists.
+     */
+    suspend fun getIncompleteSessionForLevel(levelId: Long): StudySession? {
+        return try {
+            studySessionDao.getIncompleteSessionForLevel(levelId)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Start a new session with initial progress data.
+     * Used when starting a fresh session (not resuming).
+     */
+    suspend fun startSessionWithProgress(
+        levelId: Long,
+        wordIds: List<Long>,
+        isReversed: Boolean
+    ): Long {
+        return try {
+            val session = StudySession(
+                levelId = levelId,
+                startedAt = System.currentTimeMillis(),
+                wordIds = StudySession.wordIdsToString(wordIds),
+                isReversed = isReversed
+            )
+            studySessionDao.insert(session)
+        } catch (e: Exception) {
+            -1L
+        }
+    }
+
+    /**
+     * Clean up old incomplete sessions (older than 24 hours).
+     * Should be called periodically to prevent database bloat.
+     */
+    suspend fun cleanupOldIncompleteSessions(): Boolean {
+        return try {
+            val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000
+            studySessionDao.deleteOldIncompleteSessions(oneDayAgo)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     // ==================== Study Record Management ====================
 
     /**
