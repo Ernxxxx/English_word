@@ -119,8 +119,8 @@ private fun EvaluationButton(
             disabledContentColor = Color.White.copy(alpha = 0.7f)
         ),
         elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 4.dp,
-            pressedElevation = 2.dp
+            defaultElevation = 1.dp,
+            pressedElevation = 0.dp
         )
     ) {
         Column(

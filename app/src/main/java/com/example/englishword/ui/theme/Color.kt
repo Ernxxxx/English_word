@@ -68,3 +68,13 @@ val EvaluationKnown = Color(0xFF81C784)   // Green - "覚えた"
 val EvaluationKnownDark = Color(0xFF388E3C)
 val EvaluationLater = Color(0xFFFFB74D)   // Yellow/Orange - "後で"
 val EvaluationLaterDark = Color(0xFFF57C00)
+
+// Mastery level colors (for word progress indicators)
+val MasteryLevel1 = Color(0xFFE57373)  // Red - Just seen
+val MasteryLevel2 = Color(0xFFFFB74D)  // Orange - Learning
+val MasteryLevel3 = Color(0xFFFFF176)  // Yellow - Familiar
+val MasteryLevel4 = Color(0xFFAED581)  // Light Green - Almost mastered
+val MasteryLevel5 = Color(0xFF81C784)  // Green - Mastered
+
+// Premium accent
+val PremiumOrange = Color(0xFFFFA500)

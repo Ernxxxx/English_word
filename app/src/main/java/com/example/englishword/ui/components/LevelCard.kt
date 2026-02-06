@@ -111,8 +111,8 @@ fun LevelCard(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp,
-            pressedElevation = 4.dp
+            defaultElevation = 1.dp,
+            pressedElevation = 1.dp
         )
     ) {
         Column(

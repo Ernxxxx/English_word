@@ -258,7 +258,7 @@ private fun AnimatedActionButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = buttonColor
         ),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(12.dp)
     ) {
         // Use Box to avoid RowScope.AnimatedVisibility extension function conflict
         Box(contentAlignment = Alignment.Center) {
