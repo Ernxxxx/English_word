@@ -3,6 +3,7 @@ package com.example.englishword.ads
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import com.example.englishword.BuildConfig
 import com.example.englishword.data.repository.SettingsRepository
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
@@ -40,20 +41,20 @@ class AdManager @Inject constructor(
     companion object {
         private const val TAG = "AdManager"
 
-        // Test Ad Unit IDs - Replace with real IDs for production
-        const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
-        const val TEST_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
-        const val TEST_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
+        // Test Ad Unit IDs (used in debug builds)
+        private const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
+        private const val TEST_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
+        private const val TEST_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
 
-        // Production Ad Unit IDs - Replace these with your actual ad unit IDs
-        // const val PRODUCTION_BANNER_AD_UNIT_ID = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
-        // const val PRODUCTION_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
-        // const val PRODUCTION_REWARDED_AD_UNIT_ID = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+        // Production Ad Unit IDs (TODO: Replace with real AdMob IDs before release)
+        private const val PRODUCTION_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
+        private const val PRODUCTION_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
+        private const val PRODUCTION_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
 
-        // For now, use test IDs
-        val BANNER_AD_UNIT_ID = TEST_BANNER_AD_UNIT_ID
-        val INTERSTITIAL_AD_UNIT_ID = TEST_INTERSTITIAL_AD_UNIT_ID
-        val REWARDED_AD_UNIT_ID = TEST_REWARDED_AD_UNIT_ID
+        // Auto-switch based on build type
+        val BANNER_AD_UNIT_ID = if (BuildConfig.DEBUG) TEST_BANNER_AD_UNIT_ID else PRODUCTION_BANNER_AD_UNIT_ID
+        val INTERSTITIAL_AD_UNIT_ID = if (BuildConfig.DEBUG) TEST_INTERSTITIAL_AD_UNIT_ID else PRODUCTION_INTERSTITIAL_AD_UNIT_ID
+        val REWARDED_AD_UNIT_ID = if (BuildConfig.DEBUG) TEST_REWARDED_AD_UNIT_ID else PRODUCTION_REWARDED_AD_UNIT_ID
 
         // Frequency cap for interstitial ads (show every Nth study completion)
         const val INTERSTITIAL_FREQUENCY_CAP = 3

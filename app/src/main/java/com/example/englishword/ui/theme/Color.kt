@@ -60,3 +60,11 @@ val IncorrectRedLight = Color(0xFFFFCDD2)
 val StreakOrange = Color(0xFFFF9800)
 val PremiumGold = Color(0xFFFFD700)
 val PremiumGoldDark = Color(0xFFB8860B)
+
+// Evaluation colors (themed versions for study buttons)
+val EvaluationAgain = Color(0xFFE57373)   // Red - "もう一度"
+val EvaluationAgainDark = Color(0xFFD32F2F)
+val EvaluationKnown = Color(0xFF81C784)   // Green - "覚えた"
+val EvaluationKnownDark = Color(0xFF388E3C)
+val EvaluationLater = Color(0xFFFFB74D)   // Yellow/Orange - "後で"
+val EvaluationLaterDark = Color(0xFFF57C00)

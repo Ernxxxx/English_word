@@ -1,5 +1,6 @@
 package com.example.englishword.data.repository
 
+import android.util.Log
 import com.example.englishword.data.local.dao.StudyRecordDao
 import com.example.englishword.data.local.dao.StudySessionDao
 import com.example.englishword.data.local.dao.UserStatsDao
@@ -29,6 +30,10 @@ class StudyRepository @Inject constructor(
     private val wordDao: WordDao
 ) {
 
+    companion object {
+        private const val TAG = "StudyRepository"
+    }
+
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     // ==================== Session Management ====================
@@ -45,6 +50,7 @@ class StudyRepository @Inject constructor(
             )
             studySessionDao.insert(session)
         } catch (e: Exception) {
+            Log.e(TAG, "startSession failed", e)
             -1L
         }
     }
@@ -71,6 +77,7 @@ class StudyRepository @Inject constructor(
 
             true
         } catch (e: Exception) {
+            Log.e(TAG, "completeSession failed", e)
             false
         }
     }
@@ -81,6 +88,7 @@ class StudyRepository @Inject constructor(
     fun getSessionById(sessionId: Long): Flow<StudySession?> {
         return studySessionDao.getSessionById(sessionId)
             .catch { e ->
+                Log.e(TAG, "getSessionById failed", e)
                 emit(null)
             }
     }
@@ -92,6 +100,7 @@ class StudyRepository @Inject constructor(
         return try {
             studySessionDao.getSessionByIdSync(sessionId)
         } catch (e: Exception) {
+            Log.e(TAG, "getSessionByIdSync failed", e)
             null
         }
     }
@@ -102,6 +111,7 @@ class StudyRepository @Inject constructor(
     fun getAllSessions(): Flow<List<StudySession>> {
         return studySessionDao.getAllSessions()
             .catch { e ->
+                Log.e(TAG, "getAllSessions failed", e)
                 emit(emptyList())
             }
     }
@@ -112,6 +122,7 @@ class StudyRepository @Inject constructor(
     fun getSessionsByLevel(levelId: Long): Flow<List<StudySession>> {
         return studySessionDao.getSessionsByLevel(levelId)
             .catch { e ->
+                Log.e(TAG, "getSessionsByLevel failed", e)
                 emit(emptyList())
             }
     }
@@ -122,6 +133,7 @@ class StudyRepository @Inject constructor(
     fun getIncompleteSessions(): Flow<List<StudySession>> {
         return studySessionDao.getIncompleteSessions()
             .catch { e ->
+                Log.e(TAG, "getIncompleteSessions failed", e)
                 emit(emptyList())
             }
     }
@@ -132,6 +144,7 @@ class StudyRepository @Inject constructor(
     fun getCompletedSessions(): Flow<List<StudySession>> {
         return studySessionDao.getCompletedSessions()
             .catch { e ->
+                Log.e(TAG, "getCompletedSessions failed", e)
                 emit(emptyList())
             }
     }
@@ -142,6 +155,7 @@ class StudyRepository @Inject constructor(
     fun getRecentSessions(limit: Int = 10): Flow<List<StudySession>> {
         return studySessionDao.getRecentSessions(limit)
             .catch { e ->
+                Log.e(TAG, "getRecentSessions failed", e)
                 emit(emptyList())
             }
     }
@@ -155,6 +169,7 @@ class StudyRepository @Inject constructor(
             studySessionDao.deleteById(sessionId)
             true
         } catch (e: Exception) {
+            Log.e(TAG, "deleteSession failed", e)
             false
         }
     }
@@ -188,6 +203,7 @@ class StudyRepository @Inject constructor(
             )
             true
         } catch (e: Exception) {
+            Log.e(TAG, "saveSessionProgress failed", e)
             false
         }
     }
@@ -200,6 +216,7 @@ class StudyRepository @Inject constructor(
         return try {
             studySessionDao.getIncompleteSessionForLevel(levelId)
         } catch (e: Exception) {
+            Log.e(TAG, "getIncompleteSessionForLevel failed", e)
             null
         }
     }
@@ -222,6 +239,7 @@ class StudyRepository @Inject constructor(
             )
             studySessionDao.insert(session)
         } catch (e: Exception) {
+            Log.e(TAG, "startSessionWithProgress failed", e)
             -1L
         }
     }
@@ -236,6 +254,7 @@ class StudyRepository @Inject constructor(
             studySessionDao.deleteOldIncompleteSessions(oneDayAgo)
             true
         } catch (e: Exception) {
+            Log.e(TAG, "cleanupOldIncompleteSessions failed", e)
             false
         }
     }
@@ -249,19 +268,22 @@ class StudyRepository @Inject constructor(
      * @param sessionId The current study session ID
      * @param wordId The word being studied
      * @param result The result (0=forgot, 1=hard, 2=easy)
+     * @param responseTimeMs Time in milliseconds the user took to respond (0 if not measured)
      */
     suspend fun recordResult(
         sessionId: Long,
         wordId: Long,
-        result: Int
+        result: Int,
+        responseTimeMs: Long = 0L
     ): Boolean {
         return try {
-            // Insert the study record
+            // Insert the study record with response time
             val record = StudyRecord(
                 sessionId = sessionId,
                 wordId = wordId,
                 result = result,
-                reviewedAt = System.currentTimeMillis()
+                reviewedAt = System.currentTimeMillis(),
+                responseTimeMs = responseTimeMs
             )
             studyRecordDao.insert(record)
 
@@ -270,6 +292,7 @@ class StudyRepository @Inject constructor(
 
             true
         } catch (e: Exception) {
+            Log.e(TAG, "recordResult failed", e)
             false
         }
     }
@@ -303,6 +326,7 @@ class StudyRepository @Inject constructor(
     fun getRecordsBySession(sessionId: Long): Flow<List<StudyRecord>> {
         return studyRecordDao.getRecordsBySession(sessionId)
             .catch { e ->
+                Log.e(TAG, "getRecordsBySession failed", e)
                 emit(emptyList())
             }
     }
@@ -313,6 +337,7 @@ class StudyRepository @Inject constructor(
     fun getRecordsByWord(wordId: Long): Flow<List<StudyRecord>> {
         return studyRecordDao.getRecordsByWord(wordId)
             .catch { e ->
+                Log.e(TAG, "getRecordsByWord failed", e)
                 emit(emptyList())
             }
     }
@@ -324,6 +349,7 @@ class StudyRepository @Inject constructor(
         return try {
             studyRecordDao.getSessionAccuracy(sessionId) ?: 0f
         } catch (e: Exception) {
+            Log.e(TAG, "getSessionAccuracy failed", e)
             0f
         }
     }
@@ -335,6 +361,7 @@ class StudyRepository @Inject constructor(
         return try {
             studyRecordDao.getWordAccuracy(wordId) ?: 0f
         } catch (e: Exception) {
+            Log.e(TAG, "getWordAccuracy failed", e)
             0f
         }
     }
@@ -372,7 +399,7 @@ class StudyRepository @Inject constructor(
                 )
             }
         } catch (e: Exception) {
-            // Silently fail for stats updates
+            Log.e(TAG, "updateDailyStats failed", e)
         }
     }
 
@@ -388,6 +415,7 @@ class StudyRepository @Inject constructor(
         val today = dateFormat.format(Date())
         return userStatsDao.getStatsByDate(today)
             .catch { e ->
+                Log.e(TAG, "getTodayStats failed", e)
                 emit(null)
             }
     }
@@ -398,6 +426,7 @@ class StudyRepository @Inject constructor(
     fun getRecentStats(days: Int = 7): Flow<List<UserStats>> {
         return userStatsDao.getRecentStats(days)
             .catch { e ->
+                Log.e(TAG, "getRecentStats failed", e)
                 emit(emptyList())
             }
     }
@@ -409,6 +438,7 @@ class StudyRepository @Inject constructor(
         return try {
             userStatsDao.getCurrentStreak() ?: 0
         } catch (e: Exception) {
+            Log.e(TAG, "getCurrentStreak failed", e)
             0
         }
     }
@@ -420,6 +450,7 @@ class StudyRepository @Inject constructor(
         return try {
             userStatsDao.getMaxStreak() ?: 0
         } catch (e: Exception) {
+            Log.e(TAG, "getMaxStreak failed", e)
             0
         }
     }
@@ -431,6 +462,7 @@ class StudyRepository @Inject constructor(
         return userStatsDao.getTotalStudiedCount()
             .map { it ?: 0 }
             .catch { e ->
+                Log.e(TAG, "getTotalWordsStudied failed", e)
                 emit(0)
             }
     }
@@ -442,6 +474,7 @@ class StudyRepository @Inject constructor(
         return userStatsDao.getAverageStudiedCount()
             .map { it ?: 0f }
             .catch { e ->
+                Log.e(TAG, "getAverageStudiedCount failed", e)
                 emit(0f)
             }
     }
@@ -454,6 +487,7 @@ class StudyRepository @Inject constructor(
     fun getCompletedSessionCount(): Flow<Int> {
         return studySessionDao.getCompletedSessionCount()
             .catch { e ->
+                Log.e(TAG, "getCompletedSessionCount failed", e)
                 emit(0)
             }
     }
@@ -465,6 +499,7 @@ class StudyRepository @Inject constructor(
         return studySessionDao.getTotalWordsStudied()
             .map { it ?: 0 }
             .catch { e ->
+                Log.e(TAG, "getTotalSessionWordsStudied failed", e)
                 emit(0)
             }
     }
@@ -476,6 +511,7 @@ class StudyRepository @Inject constructor(
         return studySessionDao.getTotalWordsMastered()
             .map { it ?: 0 }
             .catch { e ->
+                Log.e(TAG, "getTotalSessionWordsMastered failed", e)
                 emit(0)
             }
     }
@@ -490,6 +526,7 @@ class StudyRepository @Inject constructor(
             studyRecordDao.deleteAll()
             true
         } catch (e: Exception) {
+            Log.e(TAG, "deleteAllRecords failed", e)
             false
         }
     }
@@ -503,6 +540,7 @@ class StudyRepository @Inject constructor(
             studySessionDao.deleteAll()
             true
         } catch (e: Exception) {
+            Log.e(TAG, "deleteAllSessions failed", e)
             false
         }
     }
@@ -515,6 +553,7 @@ class StudyRepository @Inject constructor(
             userStatsDao.deleteAll()
             true
         } catch (e: Exception) {
+            Log.e(TAG, "deleteAllStats failed", e)
             false
         }
     }
@@ -529,6 +568,7 @@ class StudyRepository @Inject constructor(
             userStatsDao.deleteAll()
             true
         } catch (e: Exception) {
+            Log.e(TAG, "resetAllStudyData failed", e)
             false
         }
     }

@@ -36,6 +36,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.englishword.ui.theme.EvaluationAgain
+import com.example.englishword.ui.theme.EvaluationKnown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -267,26 +270,74 @@ private fun StudyingContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(60.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .height(72.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // まだ - 覚えていない、もう一度（カードを裏返すだけ）
+            // まだ - 覚えていない、もう一度
             Button(
                 onClick = { onEvaluate(EvaluationResult.AGAIN) },
                 enabled = state.isFlipped,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE57373)),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = EvaluationAgain,
+                    disabledContainerColor = EvaluationAgain.copy(alpha = 0.5f)
+                ),
+                shape = RoundedCornerShape(12.dp),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 2.dp,
+                    pressedElevation = 0.dp,
+                    disabledElevation = 0.dp
+                ),
                 modifier = Modifier.weight(1f).fillMaxHeight()
             ) {
-                Text("まだ\n(もう一度)", color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "まだ",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "もう一度",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                }
             }
             // 覚えた - 次の単語へ
             Button(
                 onClick = { onEvaluate(EvaluationResult.KNOWN) },
                 enabled = state.isFlipped,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF81C784)),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = EvaluationKnown,
+                    disabledContainerColor = EvaluationKnown.copy(alpha = 0.5f)
+                ),
+                shape = RoundedCornerShape(12.dp),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 2.dp,
+                    pressedElevation = 0.dp,
+                    disabledElevation = 0.dp
+                ),
                 modifier = Modifier.weight(1f).fillMaxHeight()
             ) {
-                Text("覚えた\n(次へ)", color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "覚えた",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "次へ",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                }
             }
         }
 

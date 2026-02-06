@@ -100,6 +100,49 @@ object Migrations {
     }
 
     /**
+     * Migration from version 4 to 5.
+     * Adds responseTimeMs column to study_records for tracking user response time.
+     */
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL("ALTER TABLE study_records ADD COLUMN responseTimeMs INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+    /**
+     * Migration from version 3 to 5 (skip version 4).
+     */
+    val MIGRATION_3_5 = object : Migration(3, 5) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_3_4.migrate(database)
+            MIGRATION_4_5.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 2 to 5 (skip versions 3, 4).
+     */
+    val MIGRATION_2_5 = object : Migration(2, 5) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_2_3.migrate(database)
+            MIGRATION_3_4.migrate(database)
+            MIGRATION_4_5.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 1 to 5 (skip versions 2, 3, 4).
+     */
+    val MIGRATION_1_5 = object : Migration(1, 5) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_1_2.migrate(database)
+            MIGRATION_2_3.migrate(database)
+            MIGRATION_3_4.migrate(database)
+            MIGRATION_4_5.migrate(database)
+        }
+    }
+
+    /**
      * Get all migrations for the database builder.
      */
     fun getAllMigrations(): Array<Migration> {
@@ -109,7 +152,11 @@ object Migrations {
             MIGRATION_1_3,
             MIGRATION_3_4,
             MIGRATION_1_4,
-            MIGRATION_2_4
+            MIGRATION_2_4,
+            MIGRATION_4_5,
+            MIGRATION_3_5,
+            MIGRATION_2_5,
+            MIGRATION_1_5
         )
     }
 }

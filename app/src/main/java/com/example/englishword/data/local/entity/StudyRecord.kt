@@ -33,5 +33,6 @@ data class StudyRecord(
     val sessionId: Long,
     val wordId: Long,
     val result: Int, // 0=forgot, 1=hard, 2=easy
-    val reviewedAt: Long = System.currentTimeMillis()
+    val reviewedAt: Long = System.currentTimeMillis(),
+    val responseTimeMs: Long = 0L // Time in milliseconds the user took to respond
 )

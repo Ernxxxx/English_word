@@ -38,6 +38,9 @@ class StudyViewModel @Inject constructor(
     private var laterCount = 0
     private var currentLevelId: Long = 0
 
+    // Track when card was shown to user (for response time measurement)
+    private var cardShownTimestamp: Long = 0L
+
     /**
      * Load words for study from the specified level.
      * First checks for an incomplete session to resume.
@@ -92,6 +95,9 @@ class StudyViewModel @Inject constructor(
         againCount = session.againCount
         laterCount = session.laterCount
 
+        // Start response time tracking for resumed session
+        cardShownTimestamp = System.currentTimeMillis()
+
         _uiState.value = StudyUiState.Studying(
             words = words,
             currentIndex = session.currentIndex.coerceAtMost(words.size - 1),
@@ -130,6 +136,9 @@ class StudyViewModel @Inject constructor(
         againCount = 0
         laterCount = 0
 
+        // Start response time tracking
+        cardShownTimestamp = System.currentTimeMillis()
+
         _uiState.value = StudyUiState.Studying(
             words = words,
             currentIndex = 0,
@@ -147,6 +156,10 @@ class StudyViewModel @Inject constructor(
         val currentState = _uiState.value
         if (currentState is StudyUiState.Studying) {
             _uiState.value = currentState.copy(isFlipped = !currentState.isFlipped)
+            // Reset response time when card is flipped to show answer
+            if (!currentState.isFlipped) {
+                cardShownTimestamp = System.currentTimeMillis()
+            }
         }
     }
 
@@ -172,6 +185,7 @@ class StudyViewModel @Inject constructor(
 
         val currentWord = currentState.currentWord ?: return
         val sessionId = currentState.sessionId
+        val responseTimeMs = System.currentTimeMillis() - cardShownTimestamp
 
         when (result) {
             EvaluationResult.AGAIN -> {
@@ -181,8 +195,10 @@ class StudyViewModel @Inject constructor(
 
                 // Record to database and save progress
                 viewModelScope.launch {
-                    studyRepository.recordResult(sessionId, currentWord.id, 0)
+                    studyRepository.recordResult(sessionId, currentWord.id, 0, responseTimeMs)
                     saveProgress(currentState)
+                    // Reset timer for next attempt
+                    cardShownTimestamp = System.currentTimeMillis()
                 }
             }
             EvaluationResult.LATER -> {
@@ -215,8 +231,10 @@ class StudyViewModel @Inject constructor(
 
                     // Save progress after moving to next word
                     viewModelScope.launch {
-                        studyRepository.recordResult(sessionId, currentWord.id, 2)
+                        studyRepository.recordResult(sessionId, currentWord.id, 2, responseTimeMs)
                         saveProgress(newState)
+                        // Reset timer for next word
+                        cardShownTimestamp = System.currentTimeMillis()
                     }
                 } else {
                     // 全単語完了
@@ -232,7 +250,7 @@ class StudyViewModel @Inject constructor(
 
                     // Complete session (clears progress data)
                     viewModelScope.launch {
-                        studyRepository.recordResult(sessionId, currentWord.id, 2)
+                        studyRepository.recordResult(sessionId, currentWord.id, 2, responseTimeMs)
                         studyRepository.completeSession(sessionId, knownCount + againCount, knownCount)
                         val streak = studyRepository.getCurrentStreak()
                         val completedState = _uiState.value
