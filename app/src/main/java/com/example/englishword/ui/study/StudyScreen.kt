@@ -1,21 +1,13 @@
 package com.example.englishword.ui.study
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,8 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -36,9 +26,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.shape.RoundedCornerShape
-import com.example.englishword.ui.theme.EvaluationAgain
-import com.example.englishword.ui.theme.EvaluationKnown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -312,80 +298,11 @@ private fun StudyingContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Buttons - always at bottom
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(72.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // まだ - 覚えていない、もう一度
-            Button(
-                onClick = { onEvaluate(EvaluationResult.AGAIN) },
-                enabled = state.isFlipped,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = EvaluationAgain,
-                    disabledContainerColor = EvaluationAgain.copy(alpha = 0.5f)
-                ),
-                shape = RoundedCornerShape(12.dp),
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 2.dp,
-                    pressedElevation = 0.dp,
-                    disabledElevation = 0.dp
-                ),
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "まだ",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "もう一度",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
-                }
-            }
-            // 覚えた - 次の単語へ
-            Button(
-                onClick = { onEvaluate(EvaluationResult.KNOWN) },
-                enabled = state.isFlipped,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = EvaluationKnown,
-                    disabledContainerColor = EvaluationKnown.copy(alpha = 0.5f)
-                ),
-                shape = RoundedCornerShape(12.dp),
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 2.dp,
-                    pressedElevation = 0.dp,
-                    disabledElevation = 0.dp
-                ),
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "覚えた",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "次へ",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
-                }
-            }
-        }
+        // Evaluation buttons (まだ / あとで / 覚えた)
+        EvaluationButtons(
+            onEvaluate = onEvaluate,
+            enabled = state.isFlipped
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
     }

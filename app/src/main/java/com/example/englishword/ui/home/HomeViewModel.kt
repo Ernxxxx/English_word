@@ -428,13 +428,6 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
-     * Get today's review count.
-     */
-    private suspend fun loadTodayReviewCount(): Int {
-        return unlockRepository.getTodayReviewCount()
-    }
-
-    /**
      * Data class for combining multiple Flow results.
      */
     private data class CombinedData(
