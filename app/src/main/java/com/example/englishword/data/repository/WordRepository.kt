@@ -1,10 +1,13 @@
 package com.example.englishword.data.repository
 
+import android.util.Log
 import com.example.englishword.data.local.dao.WordDao
 import com.example.englishword.data.local.entity.Word
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import com.example.englishword.util.SrsCalculator
+import com.example.englishword.domain.model.ReviewResult
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,6 +20,10 @@ class WordRepository @Inject constructor(
     private val wordDao: WordDao
 ) {
 
+    companion object {
+        private const val TAG = "WordRepository"
+    }
+
     // ==================== Read Operations ====================
 
     /**
@@ -25,6 +32,7 @@ class WordRepository @Inject constructor(
     fun getAllWords(): Flow<List<Word>> {
         return wordDao.getAllWords()
             .catch { e ->
+                Log.e(TAG, "getAllWords failed", e)
                 emit(emptyList())
             }
     }
@@ -35,6 +43,7 @@ class WordRepository @Inject constructor(
     fun getWordsByLevel(levelId: Long): Flow<List<Word>> {
         return wordDao.getWordsByLevel(levelId)
             .catch { e ->
+                Log.e(TAG, "getWordsByLevel failed", e)
                 emit(emptyList())
             }
     }
@@ -45,6 +54,7 @@ class WordRepository @Inject constructor(
     fun getWordById(wordId: Long): Flow<Word?> {
         return wordDao.getWordById(wordId)
             .catch { e ->
+                Log.e(TAG, "getWordById failed", e)
                 emit(null)
             }
     }
@@ -56,6 +66,7 @@ class WordRepository @Inject constructor(
         return try {
             wordDao.getWordByIdSync(wordId)
         } catch (e: Exception) {
+            Log.e(TAG, "getWordByIdSync failed", e)
             null
         }
     }
@@ -72,6 +83,7 @@ class WordRepository @Inject constructor(
             val wordMap = words.associateBy { it.id }
             wordIds.mapNotNull { wordMap[it] }
         } catch (e: Exception) {
+            Log.e(TAG, "getWordsByIds failed", e)
             emptyList()
         }
     }
@@ -85,6 +97,7 @@ class WordRepository @Inject constructor(
         }
         return wordDao.searchWords(query)
             .catch { e ->
+                Log.e(TAG, "searchWords failed", e)
                 emit(emptyList())
             }
     }
@@ -97,6 +110,7 @@ class WordRepository @Inject constructor(
     fun getTotalWordCount(): Flow<Int> {
         return wordDao.getTotalWordCount()
             .catch { e ->
+                Log.e(TAG, "getTotalWordCount failed", e)
                 emit(0)
             }
     }
@@ -107,6 +121,7 @@ class WordRepository @Inject constructor(
     fun getWordCountByLevel(levelId: Long): Flow<Int> {
         return wordDao.getWordCountByLevel(levelId)
             .catch { e ->
+                Log.e(TAG, "getWordCountByLevel failed", e)
                 emit(0)
             }
     }
@@ -117,6 +132,7 @@ class WordRepository @Inject constructor(
     fun getTotalMasteredCount(): Flow<Int> {
         return wordDao.getTotalMasteredCount()
             .catch { e ->
+                Log.e(TAG, "getTotalMasteredCount failed", e)
                 emit(0)
             }
     }
@@ -127,6 +143,7 @@ class WordRepository @Inject constructor(
     fun getMasteredCountByLevel(levelId: Long): Flow<Int> {
         return wordDao.getMasteredCountByLevel(levelId)
             .catch { e ->
+                Log.e(TAG, "getMasteredCountByLevel failed", e)
                 emit(0)
             }
     }
@@ -142,6 +159,7 @@ class WordRepository @Inject constructor(
             val currentTime = System.currentTimeMillis()
             wordDao.getWordsForReview(levelId, currentTime, limit)
         } catch (e: Exception) {
+            Log.e(TAG, "getWordsForReview failed", e)
             emptyList()
         }
     }
@@ -154,6 +172,7 @@ class WordRepository @Inject constructor(
             val currentTime = System.currentTimeMillis()
             wordDao.getAllWordsForReview(currentTime, limit)
         } catch (e: Exception) {
+            Log.e(TAG, "getAllWordsForReview failed", e)
             emptyList()
         }
     }
@@ -164,6 +183,7 @@ class WordRepository @Inject constructor(
     fun getWordsByMasteryLevel(levelId: Long, masteryLevel: Int): Flow<List<Word>> {
         return wordDao.getWordsByMasteryLevel(levelId, masteryLevel)
             .catch { e ->
+                Log.e(TAG, "getWordsByMasteryLevel failed", e)
                 emit(emptyList())
             }
     }
@@ -174,6 +194,7 @@ class WordRepository @Inject constructor(
     fun getMasteredWords(levelId: Long): Flow<List<Word>> {
         return wordDao.getMasteredWords(levelId)
             .catch { e ->
+                Log.e(TAG, "getMasteredWords failed", e)
                 emit(emptyList())
             }
     }
@@ -184,6 +205,7 @@ class WordRepository @Inject constructor(
     fun getUnmasteredWords(levelId: Long): Flow<List<Word>> {
         return wordDao.getUnmasteredWords(levelId)
             .catch { e ->
+                Log.e(TAG, "getUnmasteredWords failed", e)
                 emit(emptyList())
             }
     }
@@ -198,6 +220,7 @@ class WordRepository @Inject constructor(
         return try {
             wordDao.insert(word)
         } catch (e: Exception) {
+            Log.e(TAG, "insertWord failed", e)
             -1L
         }
     }
@@ -222,6 +245,7 @@ class WordRepository @Inject constructor(
             )
             wordDao.insert(word)
         } catch (e: Exception) {
+            Log.e(TAG, "insertWord failed", e)
             -1L
         }
     }
@@ -234,6 +258,7 @@ class WordRepository @Inject constructor(
         return try {
             wordDao.insertAll(words)
         } catch (e: Exception) {
+            Log.e(TAG, "insertWords failed", e)
             emptyList()
         }
     }
@@ -247,28 +272,29 @@ class WordRepository @Inject constructor(
             wordDao.update(word.copy(updatedAt = System.currentTimeMillis()))
             true
         } catch (e: Exception) {
+            Log.e(TAG, "updateWord failed", e)
             false
         }
     }
 
     /**
      * Update word mastery level and calculate next review time using SRS algorithm.
+     * Delegates to the centralized SrsCalculator for consistent behavior across the app.
      *
      * @param wordId The ID of the word to update
      * @param isCorrect Whether the user answered correctly
-     * @param quality Quality of recall (0-5): 0=complete blackout, 5=perfect response
+     * @param quality Unused - kept for API compatibility. SRS result is derived from isCorrect.
      */
     suspend fun updateMastery(wordId: Long, isCorrect: Boolean, quality: Int = if (isCorrect) 4 else 1): Boolean {
         return try {
             val word = wordDao.getWordByIdSync(wordId) ?: return false
 
-            val newMasteryLevel = when {
-                !isCorrect -> maxOf(0, word.masteryLevel - 1)
-                word.masteryLevel < 5 -> word.masteryLevel + 1
-                else -> 5
-            }
-
-            val nextReviewAt = calculateNextReviewTime(newMasteryLevel, quality)
+            // Use centralized SrsCalculator for consistent SRS logic
+            val result = if (isCorrect) ReviewResult.KNOWN else ReviewResult.AGAIN
+            val (newMasteryLevel, nextReviewAt) = SrsCalculator.calculateNextReview(
+                currentLevel = word.masteryLevel,
+                result = result
+            )
 
             wordDao.updateMastery(
                 wordId = wordId,
@@ -277,37 +303,9 @@ class WordRepository @Inject constructor(
             )
             true
         } catch (e: Exception) {
+            Log.e(TAG, "updateMastery failed", e)
             false
         }
-    }
-
-    /**
-     * Calculate the next review time based on mastery level and quality.
-     * Uses a simplified SM-2 algorithm.
-     */
-    private fun calculateNextReviewTime(masteryLevel: Int, quality: Int): Long {
-        val now = System.currentTimeMillis()
-        val intervalMinutes = when (masteryLevel) {
-            0 -> 1L           // 1 minute
-            1 -> 10L          // 10 minutes
-            2 -> 60L          // 1 hour
-            3 -> 24 * 60L     // 1 day
-            4 -> 3 * 24 * 60L // 3 days
-            5 -> 7 * 24 * 60L // 7 days
-            else -> 7 * 24 * 60L
-        }
-
-        // Adjust interval based on quality
-        val qualityMultiplier = when {
-            quality <= 1 -> 0.5
-            quality == 2 -> 0.75
-            quality == 3 -> 1.0
-            quality == 4 -> 1.25
-            else -> 1.5
-        }
-
-        val adjustedInterval = (intervalMinutes * qualityMultiplier).toLong()
-        return now + (adjustedInterval * 60 * 1000) // Convert to milliseconds
     }
 
     /**
@@ -326,6 +324,7 @@ class WordRepository @Inject constructor(
             )
             true
         } catch (e: Exception) {
+            Log.e(TAG, "resetWordProgress failed", e)
             false
         }
     }
@@ -348,6 +347,7 @@ class WordRepository @Inject constructor(
             }
             true
         } catch (e: Exception) {
+            Log.e(TAG, "resetLevelProgress failed", e)
             false
         }
     }
@@ -363,6 +363,7 @@ class WordRepository @Inject constructor(
             wordDao.deleteById(wordId)
             true
         } catch (e: Exception) {
+            Log.e(TAG, "deleteWord failed", e)
             false
         }
     }
@@ -375,6 +376,7 @@ class WordRepository @Inject constructor(
             wordDao.delete(word)
             true
         } catch (e: Exception) {
+            Log.e(TAG, "deleteWord failed", e)
             false
         }
     }
@@ -387,6 +389,7 @@ class WordRepository @Inject constructor(
             wordDao.deleteByLevel(levelId)
             true
         } catch (e: Exception) {
+            Log.e(TAG, "deleteWordsByLevel failed", e)
             false
         }
     }
@@ -399,6 +402,7 @@ class WordRepository @Inject constructor(
             wordDao.deleteAll()
             true
         } catch (e: Exception) {
+            Log.e(TAG, "deleteAllWords failed", e)
             false
         }
     }
@@ -412,6 +416,7 @@ class WordRepository @Inject constructor(
         return try {
             wordDao.getWordByEnglish(english) != null
         } catch (e: Exception) {
+            Log.e(TAG, "wordExists failed", e)
             false
         }
     }
@@ -431,6 +436,7 @@ class WordRepository @Inject constructor(
             val ids = wordDao.insertAll(words)
             ids.size
         } catch (e: Exception) {
+            Log.e(TAG, "importWords failed", e)
             0
         }
     }
