@@ -29,14 +29,8 @@ import androidx.compose.ui.unit.dp
 import com.example.englishword.ui.study.EvaluationResult
 import com.example.englishword.ui.theme.EnglishWordTheme
 import com.example.englishword.ui.theme.EvaluationAgain
-import com.example.englishword.ui.theme.EvaluationAgainDark
 import com.example.englishword.ui.theme.EvaluationKnown
-import com.example.englishword.ui.theme.EvaluationKnownDark
 import com.example.englishword.ui.theme.EvaluationLater
-import com.example.englishword.ui.theme.EvaluationLaterDark
-
-// Evaluation colors are now defined in Color.kt as:
-// EvaluationAgain, EvaluationAgainDark, EvaluationLater, EvaluationLaterDark, EvaluationKnown, EvaluationKnownDark
 
 /**
  * Evaluation buttons component for rating word knowledge.
@@ -55,12 +49,10 @@ fun EvaluationButtons(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Again button (red/orange)
         EvaluationButton(
             text = "まだ",
             icon = Icons.Default.Close,
             backgroundColor = EvaluationAgain,
-            pressedColor = EvaluationAgainDark,
             onClick = { onEvaluate(EvaluationResult.AGAIN) },
             enabled = enabled,
             modifier = Modifier.weight(1f)
@@ -68,12 +60,10 @@ fun EvaluationButtons(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Later button (yellow)
         EvaluationButton(
             text = "あとで",
             icon = Icons.Default.Refresh,
             backgroundColor = EvaluationLater,
-            pressedColor = EvaluationLaterDark,
             onClick = { onEvaluate(EvaluationResult.LATER) },
             enabled = enabled,
             modifier = Modifier.weight(1f)
@@ -81,12 +71,10 @@ fun EvaluationButtons(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Known button (green)
         EvaluationButton(
             text = "覚えた",
             icon = Icons.Default.Check,
             backgroundColor = EvaluationKnown,
-            pressedColor = EvaluationKnownDark,
             onClick = { onEvaluate(EvaluationResult.KNOWN) },
             enabled = enabled,
             modifier = Modifier.weight(1f)
@@ -94,15 +82,11 @@ fun EvaluationButtons(
     }
 }
 
-/**
- * Individual evaluation button - simplified without animation state issues.
- */
 @Composable
 private fun EvaluationButton(
     text: String,
     icon: ImageVector,
     backgroundColor: Color,
-    pressedColor: Color,
     onClick: () -> Unit,
     enabled: Boolean,
     modifier: Modifier = Modifier
@@ -138,61 +122,6 @@ private fun EvaluationButton(
                 style = MaterialTheme.typography.labelLarge
             )
         }
-    }
-}
-
-/**
- * Japanese version of EvaluationButtons.
- */
-@Composable
-fun EvaluationButtonsJapanese(
-    onEvaluate: (EvaluationResult) -> Unit,
-    enabled: Boolean = true,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Again button (red/orange)
-        EvaluationButton(
-            text = "まだ",
-            icon = Icons.Default.Close,
-            backgroundColor = EvaluationAgain,
-            pressedColor = EvaluationAgainDark,
-            onClick = { onEvaluate(EvaluationResult.AGAIN) },
-            enabled = enabled,
-            modifier = Modifier.weight(1f)
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        // Later button (yellow)
-        EvaluationButton(
-            text = "あとで",
-            icon = Icons.Default.Refresh,
-            backgroundColor = EvaluationLater,
-            pressedColor = EvaluationLaterDark,
-            onClick = { onEvaluate(EvaluationResult.LATER) },
-            enabled = enabled,
-            modifier = Modifier.weight(1f)
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        // Known button (green)
-        EvaluationButton(
-            text = "覚えた",
-            icon = Icons.Default.Check,
-            backgroundColor = EvaluationKnown,
-            pressedColor = EvaluationKnownDark,
-            onClick = { onEvaluate(EvaluationResult.KNOWN) },
-            enabled = enabled,
-            modifier = Modifier.weight(1f)
-        )
     }
 }
 

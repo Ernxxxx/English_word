@@ -280,17 +280,15 @@ class WordRepository @Inject constructor(
     /**
      * Update word mastery level and calculate next review time using SRS algorithm.
      * Delegates to the centralized SrsCalculator for consistent behavior across the app.
+     * Supports all 3 review results: AGAIN, LATER, KNOWN.
      *
      * @param wordId The ID of the word to update
-     * @param isCorrect Whether the user answered correctly
-     * @param quality Unused - kept for API compatibility. SRS result is derived from isCorrect.
+     * @param result The review result (AGAIN/LATER/KNOWN)
      */
-    suspend fun updateMastery(wordId: Long, isCorrect: Boolean, quality: Int = if (isCorrect) 4 else 1): Boolean {
+    suspend fun updateMastery(wordId: Long, result: ReviewResult): Boolean {
         return try {
             val word = wordDao.getWordByIdSync(wordId) ?: return false
 
-            // Use centralized SrsCalculator for consistent SRS logic
-            val result = if (isCorrect) ReviewResult.KNOWN else ReviewResult.AGAIN
             val (newMasteryLevel, nextReviewAt) = SrsCalculator.calculateNextReview(
                 currentLevel = word.masteryLevel,
                 result = result
