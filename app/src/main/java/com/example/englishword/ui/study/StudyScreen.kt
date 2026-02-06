@@ -47,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -54,6 +55,11 @@ import com.example.englishword.data.local.entity.Word
 import com.example.englishword.ui.components.EvaluationButtons
 import com.example.englishword.ui.components.FlashCard
 import com.example.englishword.ui.theme.EnglishWordTheme
+import com.example.englishword.ui.theme.MasteryLevel1
+import com.example.englishword.ui.theme.MasteryLevel2
+import com.example.englishword.ui.theme.MasteryLevel3
+import com.example.englishword.ui.theme.MasteryLevel4
+import com.example.englishword.ui.theme.MasteryLevel5
 
 /**
  * Main study screen composable.
@@ -253,6 +259,46 @@ private fun StudyingContent(
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        // Mastery info row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val masteryLevel = currentWord.masteryLevel
+            val masteryColor = getMasteryColor(masteryLevel)
+            val masteryLabel = when (masteryLevel) {
+                0 -> "新規"
+                1 -> "1/5"
+                2 -> "2/5"
+                3 -> "3/5"
+                4 -> "4/5"
+                5 -> "完璧"
+                else -> "$masteryLevel/5"
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "習熟度",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.size(6.dp))
+                Text(
+                    text = masteryLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = masteryColor
+                )
+            }
+            Text(
+                text = "復習 ${currentWord.reviewCount}回",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
         // Flash card - fixed height
         FlashCard(
             word = currentWord,
@@ -460,5 +506,17 @@ private fun StudyScreenErrorPreview() {
             onToggleDirection = {},
             onNavigateBack = {}
         )
+    }
+}
+
+private fun getMasteryColor(level: Int): androidx.compose.ui.graphics.Color {
+    return when (level) {
+        0 -> MasteryLevel1
+        1 -> MasteryLevel1
+        2 -> MasteryLevel2
+        3 -> MasteryLevel3
+        4 -> MasteryLevel4
+        5 -> MasteryLevel5
+        else -> MasteryLevel1
     }
 }

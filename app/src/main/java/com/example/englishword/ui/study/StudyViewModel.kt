@@ -202,13 +202,15 @@ class StudyViewModel @Inject constructor(
                 }
             }
             EvaluationResult.LATER -> {
-                // 使わない（互換性のために残す）
+                // あとで: 現在のセッション後半で再出題
                 laterCount++
                 _uiState.value = currentState.copy(isFlipped = false)
 
-                // Save progress
+                // Record to database and save progress
                 viewModelScope.launch {
+                    studyRepository.recordResult(sessionId, currentWord.id, 1, responseTimeMs)
                     saveProgress(currentState)
+                    cardShownTimestamp = System.currentTimeMillis()
                 }
             }
             EvaluationResult.KNOWN -> {
