@@ -27,6 +27,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.englishword.billing.BillingRepository
 import com.example.englishword.billing.PremiumManager
+import com.example.englishword.ui.theme.PremiumGold
+import com.example.englishword.ui.theme.PremiumOrange
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -203,8 +205,8 @@ fun PremiumScreen(
                     .background(
                         Brush.linearGradient(
                             colors = listOf(
-                                Color(0xFFFFD700),
-                                Color(0xFFFFA500)
+                                PremiumGold,
+                                PremiumOrange
                             )
                         )
                     ),
@@ -423,7 +425,7 @@ private fun PremiumFeatureItem(
         Icon(
             imageVector = Icons.Default.Check,
             contentDescription = null,
-            tint = Color(0xFFFFD700),
+            tint = PremiumGold,
             modifier = Modifier.size(24.dp)
         )
         Spacer(modifier = Modifier.width(12.dp))

@@ -38,6 +38,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import com.example.englishword.ui.theme.MasteryLevel1
+import com.example.englishword.ui.theme.MasteryLevel2
+import com.example.englishword.ui.theme.MasteryLevel3
+import com.example.englishword.ui.theme.MasteryLevel4
+import com.example.englishword.ui.theme.MasteryLevel5
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -72,8 +77,7 @@ fun WordListScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
@@ -239,11 +243,11 @@ private fun WordListItem(word: Word) {
 private fun getMasteryColor(masteryLevel: Int): Color {
     return when (masteryLevel) {
         0 -> MaterialTheme.colorScheme.outline
-        1 -> Color(0xFFE57373) // Red
-        2 -> Color(0xFFFFB74D) // Orange
-        3 -> Color(0xFFFFF176) // Yellow
-        4 -> Color(0xFFAED581) // Light Green
-        5 -> Color(0xFF81C784) // Green
+        1 -> MasteryLevel1
+        2 -> MasteryLevel2
+        3 -> MasteryLevel3
+        4 -> MasteryLevel4
+        5 -> MasteryLevel5
         else -> MaterialTheme.colorScheme.outline
     }
 }

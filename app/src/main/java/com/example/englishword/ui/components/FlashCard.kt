@@ -62,10 +62,10 @@ fun FlashCard(
                 rotationY = rotation
                 cameraDistance = 12f * density
             },
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 8.dp,
-            pressedElevation = 4.dp
+            defaultElevation = 3.dp,
+            pressedElevation = 1.dp
         ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
