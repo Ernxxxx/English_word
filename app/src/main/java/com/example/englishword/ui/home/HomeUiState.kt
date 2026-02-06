@@ -45,11 +45,6 @@ data class HomeUiState(
     val error: String? = null,
 
     /**
-     * Whether the add level dialog is shown.
-     */
-    val showAddLevelDialog: Boolean = false,
-
-    /**
      * Whether the delete confirmation dialog is shown.
      */
     val showDeleteDialog: Boolean = false,
@@ -79,26 +74,6 @@ data class HomeUiState(
      */
     val levelToUnlock: Long? = null
 ) {
-    companion object {
-        /**
-         * Maximum number of levels for free tier users.
-         */
-        const val FREE_TIER_MAX_LEVELS = 3
-    }
-
-    /**
-     * Whether the user can add more levels.
-     * Free tier users are limited to 3 parent levels.
-     */
-    val canAddLevel: Boolean
-        get() = isPremium || parentLevels.size < FREE_TIER_MAX_LEVELS
-
-    /**
-     * Remaining level slots for free tier users.
-     */
-    val remainingLevelSlots: Int
-        get() = if (isPremium) Int.MAX_VALUE else (FREE_TIER_MAX_LEVELS - parentLevels.size).coerceAtLeast(0)
-
     /**
      * Progress towards daily goal as a fraction (0.0 to 1.0).
      */

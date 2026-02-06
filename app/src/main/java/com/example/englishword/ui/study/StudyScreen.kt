@@ -298,11 +298,28 @@ private fun StudyingContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Evaluation buttons (まだ / あとで / 覚えた)
-        EvaluationButtons(
-            onEvaluate = onEvaluate,
-            enabled = state.isFlipped
-        )
+        if (state.isFlipped) {
+            // カードめくり後: 評価ボタン表示
+            EvaluationButtons(
+                onEvaluate = onEvaluate,
+                enabled = true
+            )
+        } else {
+            // カードめくり前: ヒント表示
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(72.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "カードをタップして答えを確認",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
     }

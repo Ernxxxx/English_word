@@ -25,8 +25,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -41,13 +39,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -58,7 +53,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,9 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -114,13 +106,6 @@ fun HomeScreen(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val listState = rememberLazyListState()
     val context = LocalContext.current
-
-    // Determine if FAB should be expanded
-    val isFabExpanded by remember {
-        derivedStateOf {
-            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
-        }
-    }
 
     // Handle events
     LaunchedEffect(Unit) {
@@ -178,35 +163,6 @@ fun HomeScreen(
                 scrollBehavior = scrollBehavior
             )
         },
-        floatingActionButton = {
-            AnimatedVisibility(
-                visible = !uiState.isLoading,
-                enter = fadeIn() + slideInVertically { it },
-                exit = fadeOut() + slideOutVertically { it }
-            ) {
-                if (isFabExpanded) {
-                    ExtendedFloatingActionButton(
-                        onClick = { viewModel.showAddLevelDialog() },
-                        icon = {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null
-                            )
-                        },
-                        text = { Text("Add Level") }
-                    )
-                } else {
-                    FloatingActionButton(
-                        onClick = { viewModel.showAddLevelDialog() }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add Level"
-                        )
-                    }
-                }
-            }
-        },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Box(
@@ -245,23 +201,12 @@ fun HomeScreen(
                     isPremium = uiState.isPremium,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 80.dp) // Space for FAB
+                        .padding(bottom = 8.dp)
                 )
             }
         }
     }
 
-    // Add level dialog
-    if (uiState.showAddLevelDialog) {
-        AddLevelDialog(
-            canAddLevel = uiState.canAddLevel,
-            remainingSlots = uiState.remainingLevelSlots,
-            isPremium = uiState.isPremium,
-            onDismiss = { viewModel.hideAddLevelDialog() },
-            onConfirm = { name -> viewModel.addLevel(name) },
-            onPremiumClick = onNavigateToPremium
-        )
-    }
 
     // Delete confirmation dialog
     if (uiState.showDeleteDialog && uiState.levelToDelete != null) {
@@ -340,19 +285,8 @@ private fun HomeContent(
             }
         }
 
-        // Free tier notice
-        if (!uiState.isPremium && uiState.parentLevels.isNotEmpty()) {
-            item {
-                FreeTierNotice(
-                    remainingSlots = uiState.remainingLevelSlots,
-                    onPremiumClick = onPremiumClick
-                )
-            }
-        }
-
-        // Bottom spacing for FAB
         item {
-            Spacer(modifier = Modifier.height(80.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -714,57 +648,6 @@ private fun EmptyLevelsContent() {
     }
 }
 
-@Composable
-private fun FreeTierNotice(
-    remainingSlots: Int,
-    onPremiumClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = PremiumGold.copy(alpha = 0.1f)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Star,
-                contentDescription = null,
-                tint = PremiumGold,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = if (remainingSlots > 0) {
-                        "$remainingSlots level slot${if (remainingSlots > 1) "s" else ""} remaining"
-                    } else {
-                        "Level limit reached"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "Upgrade to Premium for unlimited levels",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            TextButton(onClick = onPremiumClick) {
-                Text(
-                    text = "Upgrade",
-                    color = PremiumGold,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun LoadingContent() {
@@ -805,101 +688,6 @@ private fun ErrorContent(
             Text("Retry")
         }
     }
-}
-
-@Composable
-private fun AddLevelDialog(
-    canAddLevel: Boolean,
-    remainingSlots: Int,
-    isPremium: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-    onPremiumClick: () -> Unit
-) {
-    var levelName by remember { mutableStateOf("") }
-    val focusManager = LocalFocusManager.current
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "Add New Level",
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column {
-                if (!isPremium && remainingSlots <= 1) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        color = PremiumGold.copy(alpha = 0.1f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Star,
-                                contentDescription = null,
-                                tint = PremiumGold,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (remainingSlots == 1) {
-                                    "Last free slot!"
-                                } else {
-                                    "Upgrade for unlimited levels"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-
-                OutlinedTextField(
-                    value = levelName,
-                    onValueChange = { levelName = it },
-                    label = { Text("Level Name") },
-                    placeholder = { Text("e.g., TOEFL, GRE, Daily...") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            focusManager.clearFocus()
-                            if (levelName.isNotBlank()) {
-                                onConfirm(levelName.trim())
-                            }
-                        }
-                    )
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (levelName.isNotBlank()) {
-                        onConfirm(levelName.trim())
-                    }
-                },
-                enabled = levelName.isNotBlank()
-            ) {
-                Text("Add")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
 }
 
 @Composable
