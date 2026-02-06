@@ -180,68 +180,6 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
-     * Show the add level dialog.
-     */
-    fun showAddLevelDialog() {
-        val currentState = _uiState.value
-        if (!currentState.canAddLevel) {
-            viewModelScope.launch {
-                _events.emit(HomeEvent.NavigateToPremium)
-            }
-            return
-        }
-        _uiState.update { it.copy(showAddLevelDialog = true) }
-    }
-
-    /**
-     * Hide the add level dialog.
-     */
-    fun hideAddLevelDialog() {
-        _uiState.update { it.copy(showAddLevelDialog = false) }
-    }
-
-    /**
-     * Add a new level.
-     * Returns true if successful.
-     */
-    fun addLevel(name: String) {
-        if (name.isBlank()) {
-            viewModelScope.launch {
-                _events.emit(HomeEvent.ShowError("Level name cannot be empty"))
-            }
-            return
-        }
-
-        val currentState = _uiState.value
-        if (!currentState.canAddLevel) {
-            viewModelScope.launch {
-                _events.emit(HomeEvent.NavigateToPremium)
-            }
-            return
-        }
-
-        viewModelScope.launch {
-            try {
-                // Check if level with same name exists
-                if (levelRepository.levelExists(name)) {
-                    _events.emit(HomeEvent.ShowError("A level with this name already exists"))
-                    return@launch
-                }
-
-                val levelId = levelRepository.insertLevelWithAutoOrder(name)
-                if (levelId > 0) {
-                    hideAddLevelDialog()
-                    // Data will be refreshed automatically through Flow
-                } else {
-                    _events.emit(HomeEvent.ShowError("Failed to create level"))
-                }
-            } catch (e: Exception) {
-                _events.emit(HomeEvent.ShowError(e.message ?: "Failed to create level"))
-            }
-        }
-    }
-
-    /**
      * Show delete confirmation dialog for a level.
      */
     fun showDeleteDialog(level: LevelWithProgress) {
