@@ -202,14 +202,34 @@ class StudyViewModel @Inject constructor(
                 }
             }
             EvaluationResult.LATER -> {
-                // あとで: 現在のセッション後半で再出題
+                // あとで: laterQueueに追加して次の単語へ進む
                 laterCount++
-                _uiState.value = currentState.copy(isFlipped = false)
+                val newLaterQueue = currentState.laterQueue + currentWord
+                val nextIndex = currentState.currentIndex + 1
 
-                // Record to database and save progress
+                val newState = if (nextIndex < currentState.words.size) {
+                    currentState.copy(
+                        currentIndex = nextIndex,
+                        isFlipped = false,
+                        laterQueue = newLaterQueue
+                    )
+                } else if (newLaterQueue.isNotEmpty()) {
+                    // メインリスト終了、laterQueueを新しいリストとして開始
+                    currentState.copy(
+                        words = newLaterQueue,
+                        currentIndex = 0,
+                        isFlipped = false,
+                        laterQueue = emptyList()
+                    )
+                } else {
+                    // ありえないケース（laterQueueに追加直後なので空にはならない）
+                    currentState.copy(isFlipped = false)
+                }
+                _uiState.value = newState
+
                 viewModelScope.launch {
                     studyRepository.recordResult(sessionId, currentWord.id, 1, responseTimeMs)
-                    saveProgress(currentState)
+                    saveProgress(newState)
                     cardShownTimestamp = System.currentTimeMillis()
                 }
             }
@@ -231,11 +251,24 @@ class StudyViewModel @Inject constructor(
                     )
                     _uiState.value = newState
 
-                    // Save progress after moving to next word
                     viewModelScope.launch {
                         studyRepository.recordResult(sessionId, currentWord.id, 2, responseTimeMs)
                         saveProgress(newState)
-                        // Reset timer for next word
+                        cardShownTimestamp = System.currentTimeMillis()
+                    }
+                } else if (currentState.laterQueue.isNotEmpty()) {
+                    // メインリスト完了だがlaterQueueに単語が残っている
+                    val newState = currentState.copy(
+                        words = currentState.laterQueue,
+                        currentIndex = 0,
+                        isFlipped = false,
+                        laterQueue = emptyList()
+                    )
+                    _uiState.value = newState
+
+                    viewModelScope.launch {
+                        studyRepository.recordResult(sessionId, currentWord.id, 2, responseTimeMs)
+                        saveProgress(newState)
                         cardShownTimestamp = System.currentTimeMillis()
                     }
                 } else {
