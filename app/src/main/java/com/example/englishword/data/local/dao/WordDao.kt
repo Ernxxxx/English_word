@@ -104,10 +104,10 @@ interface WordDao {
     """)
     fun searchWords(query: String): Flow<List<Word>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(word: Word): Long
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(words: List<Word>): List<Long>
 
     @Update

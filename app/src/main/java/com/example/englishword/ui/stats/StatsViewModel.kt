@@ -75,12 +75,12 @@ class StatsViewModel @Inject constructor(
 
         /** Human-readable labels for mastery levels 0-5. */
         private val MASTERY_LABELS = listOf(
-            "New",       // 0: Not yet studied
-            "Level 1",   // 1: First exposure
-            "Level 2",   // 2: Learning
-            "Level 3",   // 3: Familiar
-            "Level 4",   // 4: Almost mastered
-            "Mastered"   // 5: Fully mastered
+            "未学習",    // 0: Not yet studied
+            "学習開始",  // 1: First exposure
+            "学習中",    // 2: Learning
+            "定着中",    // 3: Familiar
+            "ほぼ習得",  // 4: Almost mastered
+            "習得済み"   // 5: Fully mastered
         )
     }
 
