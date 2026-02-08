@@ -2,6 +2,7 @@ package com.example.englishword.ads
 
 import android.app.Activity
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import com.example.englishword.BuildConfig
 import com.example.englishword.data.repository.SettingsRepository
@@ -48,10 +49,14 @@ class AdManager @Inject constructor(
         private const val TEST_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
         private const val TEST_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
 
-        // Production Ad Unit IDs (TODO: Replace with real AdMob IDs before release)
+        // FIXME: Replace with real AdMob ad unit ID before release
         private const val PRODUCTION_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
+        // FIXME: Replace with real AdMob ad unit ID before release
         private const val PRODUCTION_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
+        // FIXME: Replace with real AdMob ad unit ID before release
         private const val PRODUCTION_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
+
+        private const val TEST_AD_PREFIX = "3940256099942544"
 
         // Auto-switch based on build type
         val BANNER_AD_UNIT_ID = if (BuildConfig.DEBUG) TEST_BANNER_AD_UNIT_ID else PRODUCTION_BANNER_AD_UNIT_ID
@@ -60,6 +65,13 @@ class AdManager @Inject constructor(
 
         // Frequency cap for interstitial ads (show every Nth study completion)
         const val INTERSTITIAL_FREQUENCY_CAP = 3
+
+        // SharedPreferences keys for persisted frequency cap counter
+        private const val AD_PREFS_NAME = "ad_frequency_prefs"
+        private const val KEY_COMPLETION_COUNT = "study_completion_count"
+        private const val KEY_LAST_RESET_TIMESTAMP = "last_reset_timestamp"
+        // Reset the counter if more than 24 hours have passed since last reset
+        private const val RESET_INTERVAL_MS = 24L * 60 * 60 * 1000
     }
 
     private val _isInitialized = MutableStateFlow(false)
@@ -76,8 +88,26 @@ class AdManager @Inject constructor(
     private val _isRewardedLoaded = MutableStateFlow(false)
     val isRewardedLoaded: StateFlow<Boolean> = _isRewardedLoaded.asStateFlow()
 
-    // Frequency cap counter for interstitial ads
-    private var studyCompletionCount = 0
+    // Frequency cap counter for interstitial ads (persisted across app restarts)
+    private val adPrefs: SharedPreferences =
+        context.getSharedPreferences(AD_PREFS_NAME, Context.MODE_PRIVATE)
+
+    private var studyCompletionCount: Int
+        get() = adPrefs.getInt(KEY_COMPLETION_COUNT, 0)
+        set(value) {
+            adPrefs.edit().putInt(KEY_COMPLETION_COUNT, value).apply()
+        }
+
+    init {
+        // Reset counter if stale (more than 24 hours since last reset)
+        val lastReset = adPrefs.getLong(KEY_LAST_RESET_TIMESTAMP, 0L)
+        if (System.currentTimeMillis() - lastReset > RESET_INTERVAL_MS) {
+            adPrefs.edit()
+                .putInt(KEY_COMPLETION_COUNT, 0)
+                .putLong(KEY_LAST_RESET_TIMESTAMP, System.currentTimeMillis())
+                .apply()
+        }
+    }
 
     init {
         // Observe premium status
@@ -101,6 +131,19 @@ class AdManager @Inject constructor(
         if (_isInitialized.value) {
             Log.d(TAG, "AdMob SDK already initialized")
             return
+        }
+
+        // Runtime safety check: warn if production build still uses test ad IDs
+        if (!BuildConfig.DEBUG) {
+            if (PRODUCTION_BANNER_AD_UNIT_ID.contains(TEST_AD_PREFIX)) {
+                Log.e(TAG, "PRODUCTION_BANNER_AD_UNIT_ID still contains test prefix! Replace with real ad unit ID before release.")
+            }
+            if (PRODUCTION_INTERSTITIAL_AD_UNIT_ID.contains(TEST_AD_PREFIX)) {
+                Log.e(TAG, "PRODUCTION_INTERSTITIAL_AD_UNIT_ID still contains test prefix! Replace with real ad unit ID before release.")
+            }
+            if (PRODUCTION_REWARDED_AD_UNIT_ID.contains(TEST_AD_PREFIX)) {
+                Log.e(TAG, "PRODUCTION_REWARDED_AD_UNIT_ID still contains test prefix! Replace with real ad unit ID before release.")
+            }
         }
 
         MobileAds.initialize(context) { initializationStatus ->
@@ -282,7 +325,10 @@ class AdManager @Inject constructor(
      * Reset the completion counter after showing an ad.
      */
     private fun resetCompletionCount() {
-        studyCompletionCount = 0
+        adPrefs.edit()
+            .putInt(KEY_COMPLETION_COUNT, 0)
+            .putLong(KEY_LAST_RESET_TIMESTAMP, System.currentTimeMillis())
+            .apply()
     }
 
     /**

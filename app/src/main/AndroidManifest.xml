@@ -25,6 +25,7 @@
         android:theme="@style/Theme.EnglishWord"
         tools:targetApi="31">
 
+        <!-- FIXME: Replace with real AdMob app ID before release -->
         <!-- AdMob App ID (Test ID for development) -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"

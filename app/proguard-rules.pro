@@ -34,6 +34,8 @@
 
 # Google Play Billing
 -keep class com.android.vending.billing.**
+-keep class com.android.billingclient.api.** { *; }
+-dontwarn com.android.billingclient.**
 
 # AdMob
 -keep class com.google.android.gms.ads.** { *; }
@@ -57,6 +59,34 @@
 -keepclassmembers enum * {
     public static **[] values();
     public static ** valueOf(java.lang.String);
+}
+
+# Jetpack Compose
+-keep class androidx.compose.runtime.** { *; }
+-keep class androidx.compose.ui.** { *; }
+-keepclassmembers class * {
+    @androidx.compose.runtime.Composable <methods>;
+}
+-dontwarn androidx.compose.**
+
+# Navigation Compose
+-keep class androidx.navigation.** { *; }
+-keep class * extends androidx.navigation.Navigator
+-keepnames class * extends androidx.navigation.NavArgs
+
+# WorkManager workers
+-keep class * extends androidx.work.Worker
+-keep class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+-keep class * extends androidx.work.CoroutineWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+
+# Strip debug and verbose logs in release builds
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
 }
 
 # Firebase Crashlytics (prepared for future integration)

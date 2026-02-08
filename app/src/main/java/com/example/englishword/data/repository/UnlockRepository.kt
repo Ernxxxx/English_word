@@ -1,20 +1,21 @@
 package com.example.englishword.data.repository
 
+import androidx.room.withTransaction
+import com.example.englishword.data.local.AppDatabase
 import com.example.englishword.data.local.dao.UnitUnlockDao
 import com.example.englishword.data.local.dao.UserSettingsDao
 import com.example.englishword.data.local.entity.UnitUnlock
 import com.example.englishword.data.local.entity.UserSettings
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class UnlockRepository @Inject constructor(
+    private val database: AppDatabase,
     private val unitUnlockDao: UnitUnlockDao,
     private val userSettingsDao: UserSettingsDao
 ) {
@@ -26,7 +27,7 @@ class UnlockRepository @Inject constructor(
         private const val KEY_REVIEW_COUNT_DATE = "review_count_date"
     }
 
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
     // ==================== Unit Unlock ====================
 
@@ -84,23 +85,52 @@ class UnlockRepository @Inject constructor(
         return if (remaining > 0) remaining else 0
     }
 
+    /**
+     * Batch-load all currently unlocked level IDs.
+     * Returns a set of level IDs that are currently unlocked (unlockUntil > now).
+     * This avoids N+1 queries when checking unlock status for multiple levels.
+     */
+    suspend fun getUnlockedLevelIds(): Set<Long> {
+        val now = System.currentTimeMillis()
+        return unitUnlockDao.getActiveUnlocks(now)
+            .map { it.levelId }
+            .toSet()
+    }
+
+    /**
+     * Batch-load remaining unlock times for all levels.
+     * Returns a map of levelId to remaining time in milliseconds.
+     * Only includes levels that are currently unlocked.
+     */
+    suspend fun getRemainingUnlockTimes(): Map<Long, Long> {
+        val now = System.currentTimeMillis()
+        return unitUnlockDao.getActiveUnlocks(now)
+            .associate { unlock ->
+                val remaining = unlock.unlockUntil - now
+                unlock.levelId to if (remaining > 0) remaining else 0L
+            }
+    }
+
     // ==================== Daily Review Limit ====================
 
     /**
      * Get today's review count.
+     * Uses a Room transaction to ensure the date-check and reset are atomic.
      */
     suspend fun getTodayReviewCount(): Int {
-        val today = dateFormat.format(Date())
-        val savedDate = userSettingsDao.getValue(KEY_REVIEW_COUNT_DATE)
+        return database.withTransaction {
+            val today = LocalDate.now().format(dateFormatter)
+            val savedDate = userSettingsDao.getValue(KEY_REVIEW_COUNT_DATE)
 
-        // Reset count if it's a new day
-        if (savedDate != today) {
-            userSettingsDao.insert(UserSettings(KEY_REVIEW_COUNT_DATE, today))
-            userSettingsDao.insert(UserSettings(KEY_TODAY_REVIEW_COUNT, "0"))
-            return 0
+            // Reset count if it's a new day
+            if (savedDate != today) {
+                userSettingsDao.insert(UserSettings(KEY_REVIEW_COUNT_DATE, today))
+                userSettingsDao.insert(UserSettings(KEY_TODAY_REVIEW_COUNT, "0"))
+                0
+            } else {
+                userSettingsDao.getValue(KEY_TODAY_REVIEW_COUNT)?.toIntOrNull() ?: 0
+            }
         }
-
-        return userSettingsDao.getValue(KEY_TODAY_REVIEW_COUNT)?.toIntOrNull() ?: 0
     }
 
     /**
@@ -122,18 +152,21 @@ class UnlockRepository @Inject constructor(
 
     /**
      * Increment today's review count.
+     * Uses a Room transaction to ensure the date-check, reset, and increment are atomic.
      */
     suspend fun incrementReviewCount() {
-        val today = dateFormat.format(Date())
-        val savedDate = userSettingsDao.getValue(KEY_REVIEW_COUNT_DATE)
+        database.withTransaction {
+            val today = LocalDate.now().format(dateFormatter)
+            val savedDate = userSettingsDao.getValue(KEY_REVIEW_COUNT_DATE)
 
-        if (savedDate != today) {
-            // New day, reset count
-            userSettingsDao.insert(UserSettings(KEY_REVIEW_COUNT_DATE, today))
-            userSettingsDao.insert(UserSettings(KEY_TODAY_REVIEW_COUNT, "1"))
-        } else {
-            val currentCount = userSettingsDao.getValue(KEY_TODAY_REVIEW_COUNT)?.toIntOrNull() ?: 0
-            userSettingsDao.insert(UserSettings(KEY_TODAY_REVIEW_COUNT, (currentCount + 1).toString()))
+            if (savedDate != today) {
+                // New day, reset count and set to 1
+                userSettingsDao.insert(UserSettings(KEY_REVIEW_COUNT_DATE, today))
+                userSettingsDao.insert(UserSettings(KEY_TODAY_REVIEW_COUNT, "1"))
+            } else {
+                val currentCount = userSettingsDao.getValue(KEY_TODAY_REVIEW_COUNT)?.toIntOrNull() ?: 0
+                userSettingsDao.insert(UserSettings(KEY_TODAY_REVIEW_COUNT, (currentCount + 1).toString()))
+            }
         }
     }
 

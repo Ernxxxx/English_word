@@ -11,6 +11,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * - Version 2: No schema changes (app updates)
  * - Version 3: Added unit_unlocks table for free tier monetization
  * - Version 4: Added session progress fields to study_sessions for session recovery
+ * - Version 5: Added responseTimeMs column to study_records
+ * - Version 6: Added composite index on words(levelId, nextReviewAt)
+ * - Version 7: Added composite index on study_records(sessionId, wordId)
  */
 object Migrations {
 
@@ -199,6 +202,76 @@ object Migrations {
     }
 
     /**
+     * Migration from version 6 to 7.
+     * Adds composite index on study_records(sessionId, wordId) for optimized lookups.
+     */
+    val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_study_records_sessionId_wordId` ON `study_records` (`sessionId`, `wordId`)")
+        }
+    }
+
+    /**
+     * Migration from version 5 to 7 (skip version 6).
+     */
+    val MIGRATION_5_7 = object : Migration(5, 7) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_5_6.migrate(database)
+            MIGRATION_6_7.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 4 to 7 (skip versions 5, 6).
+     */
+    val MIGRATION_4_7 = object : Migration(4, 7) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_4_5.migrate(database)
+            MIGRATION_5_6.migrate(database)
+            MIGRATION_6_7.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 3 to 7 (skip versions 4, 5, 6).
+     */
+    val MIGRATION_3_7 = object : Migration(3, 7) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_3_4.migrate(database)
+            MIGRATION_4_5.migrate(database)
+            MIGRATION_5_6.migrate(database)
+            MIGRATION_6_7.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 2 to 7 (skip versions 3, 4, 5, 6).
+     */
+    val MIGRATION_2_7 = object : Migration(2, 7) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_2_3.migrate(database)
+            MIGRATION_3_4.migrate(database)
+            MIGRATION_4_5.migrate(database)
+            MIGRATION_5_6.migrate(database)
+            MIGRATION_6_7.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 1 to 7 (skip versions 2, 3, 4, 5, 6).
+     */
+    val MIGRATION_1_7 = object : Migration(1, 7) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_1_2.migrate(database)
+            MIGRATION_2_3.migrate(database)
+            MIGRATION_3_4.migrate(database)
+            MIGRATION_4_5.migrate(database)
+            MIGRATION_5_6.migrate(database)
+            MIGRATION_6_7.migrate(database)
+        }
+    }
+
+    /**
      * Get all migrations for the database builder.
      */
     fun getAllMigrations(): Array<Migration> {
@@ -217,7 +290,13 @@ object Migrations {
             MIGRATION_4_6,
             MIGRATION_3_6,
             MIGRATION_2_6,
-            MIGRATION_1_6
+            MIGRATION_1_6,
+            MIGRATION_6_7,
+            MIGRATION_5_7,
+            MIGRATION_4_7,
+            MIGRATION_3_7,
+            MIGRATION_2_7,
+            MIGRATION_1_7
         )
     }
 }

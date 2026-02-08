@@ -32,6 +32,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -92,6 +95,8 @@ fun WordListScreen(
             }
         }
     ) { paddingValues ->
+        var searchActive by remember { mutableStateOf(false) }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -101,9 +106,9 @@ fun WordListScreen(
             SearchBar(
                 query = uiState.searchQuery,
                 onQueryChange = { viewModel.onEvent(WordListEvent.SearchQueryChanged(it)) },
-                onSearch = { },
-                active = false,
-                onActiveChange = { },
+                onSearch = { searchActive = false },
+                active = searchActive,
+                onActiveChange = { searchActive = it },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -117,7 +122,10 @@ fun WordListScreen(
                 trailingIcon = {
                     if (uiState.searchQuery.isNotEmpty()) {
                         IconButton(
-                            onClick = { viewModel.onEvent(WordListEvent.SearchQueryChanged("")) }
+                            onClick = {
+                                viewModel.onEvent(WordListEvent.SearchQueryChanged(""))
+                                searchActive = false
+                            }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Clear,

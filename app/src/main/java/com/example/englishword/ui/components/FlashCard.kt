@@ -160,7 +160,7 @@ private fun FlashCardFront(
                     ) {
                         Icon(
                             imageVector = if (isSpeaking) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
-                            contentDescription = "発音",
+                            contentDescription = "発音を聞く",
                             tint = if (isTtsReady)
                                 MaterialTheme.colorScheme.primary
                             else
@@ -269,7 +269,7 @@ private fun FlashCardEnglishBack(
                     ) {
                         Icon(
                             imageVector = if (isSpeaking) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
-                            contentDescription = "発音",
+                            contentDescription = "発音を聞く",
                             tint = if (isTtsReady)
                                 MaterialTheme.colorScheme.primary
                             else
@@ -342,7 +342,7 @@ private fun FlashCardBack(
                     ) {
                         Icon(
                             imageVector = if (isSpeaking) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
-                            contentDescription = "発音",
+                            contentDescription = "発音を聞く",
                             tint = if (isTtsReady)
                                 MaterialTheme.colorScheme.primary
                             else

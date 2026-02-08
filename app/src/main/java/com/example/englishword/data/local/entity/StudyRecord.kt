@@ -24,7 +24,8 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["sessionId"]),
         Index(value = ["wordId"]),
-        Index(value = ["reviewedAt"])
+        Index(value = ["reviewedAt"]),
+        Index(value = ["sessionId", "wordId"])
     ]
 )
 data class StudyRecord(

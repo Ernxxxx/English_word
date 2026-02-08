@@ -1,17 +1,24 @@
 package com.example.englishword.di
 
+import com.example.englishword.BuildConfig
 import com.example.englishword.util.CrashReporter
 import com.example.englishword.util.DebugCrashReporter
-import dagger.Binds
+import com.example.englishword.util.ProductionCrashReporter
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class InfraModule {
-    @Binds
+object InfraModule {
+    @Provides
     @Singleton
-    abstract fun bindCrashReporter(impl: DebugCrashReporter): CrashReporter
+    fun provideCrashReporter(
+        debug: DebugCrashReporter,
+        production: ProductionCrashReporter
+    ): CrashReporter {
+        return if (BuildConfig.DEBUG) debug else production
+    }
 }

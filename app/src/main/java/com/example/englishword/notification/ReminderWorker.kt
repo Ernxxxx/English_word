@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.example.englishword.util.CrashReporter
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
@@ -14,7 +15,8 @@ import dagger.assisted.AssistedInject
 class ReminderWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted workerParams: WorkerParameters,
-    private val notificationHelper: NotificationHelper
+    private val notificationHelper: NotificationHelper,
+    private val crashReporter: CrashReporter
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {
@@ -30,7 +32,7 @@ class ReminderWorker @AssistedInject constructor(
             )
             Result.success()
         } catch (e: Exception) {
-            e.printStackTrace()
+            crashReporter.recordException(e)
             Result.failure()
         }
     }
