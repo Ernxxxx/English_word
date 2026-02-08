@@ -20,7 +20,8 @@ import androidx.room.PrimaryKey
         Index(value = ["english"]),
         Index(value = ["masteryLevel"]),
         Index(value = ["nextReviewAt"]),
-        Index(value = ["levelId", "nextReviewAt"])
+        Index(value = ["levelId", "nextReviewAt"]),
+        Index(value = ["levelId", "english"], unique = true)
     ]
 )
 data class Word(

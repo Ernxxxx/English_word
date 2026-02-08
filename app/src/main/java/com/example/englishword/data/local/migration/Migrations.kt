@@ -272,6 +272,98 @@ object Migrations {
     }
 
     /**
+     * Migration from version 7 to 8.
+     * Deduplicates words and adds unique index on (levelId, english) to prevent duplicate words.
+     */
+    val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // Remove duplicates keeping the row with highest masteryLevel (or highest id as tiebreaker)
+            database.execSQL("""
+                DELETE FROM words WHERE id NOT IN (
+                    SELECT MAX(id) FROM words GROUP BY levelId, english
+                )
+            """.trimIndent())
+            // Add unique constraint
+            database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_words_levelId_english` ON `words` (`levelId`, `english`)")
+        }
+    }
+
+    /**
+     * Migration from version 6 to 8 (skip version 7).
+     */
+    val MIGRATION_6_8 = object : Migration(6, 8) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_6_7.migrate(database)
+            MIGRATION_7_8.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 5 to 8 (skip versions 6, 7).
+     */
+    val MIGRATION_5_8 = object : Migration(5, 8) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_5_6.migrate(database)
+            MIGRATION_6_7.migrate(database)
+            MIGRATION_7_8.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 4 to 8 (skip versions 5, 6, 7).
+     */
+    val MIGRATION_4_8 = object : Migration(4, 8) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_4_5.migrate(database)
+            MIGRATION_5_6.migrate(database)
+            MIGRATION_6_7.migrate(database)
+            MIGRATION_7_8.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 3 to 8 (skip versions 4, 5, 6, 7).
+     */
+    val MIGRATION_3_8 = object : Migration(3, 8) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_3_4.migrate(database)
+            MIGRATION_4_5.migrate(database)
+            MIGRATION_5_6.migrate(database)
+            MIGRATION_6_7.migrate(database)
+            MIGRATION_7_8.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 2 to 8 (skip versions 3, 4, 5, 6, 7).
+     */
+    val MIGRATION_2_8 = object : Migration(2, 8) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_2_3.migrate(database)
+            MIGRATION_3_4.migrate(database)
+            MIGRATION_4_5.migrate(database)
+            MIGRATION_5_6.migrate(database)
+            MIGRATION_6_7.migrate(database)
+            MIGRATION_7_8.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 1 to 8 (skip versions 2, 3, 4, 5, 6, 7).
+     */
+    val MIGRATION_1_8 = object : Migration(1, 8) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_1_2.migrate(database)
+            MIGRATION_2_3.migrate(database)
+            MIGRATION_3_4.migrate(database)
+            MIGRATION_4_5.migrate(database)
+            MIGRATION_5_6.migrate(database)
+            MIGRATION_6_7.migrate(database)
+            MIGRATION_7_8.migrate(database)
+        }
+    }
+
+    /**
      * Get all migrations for the database builder.
      */
     fun getAllMigrations(): Array<Migration> {
@@ -296,7 +388,14 @@ object Migrations {
             MIGRATION_4_7,
             MIGRATION_3_7,
             MIGRATION_2_7,
-            MIGRATION_1_7
+            MIGRATION_1_7,
+            MIGRATION_7_8,
+            MIGRATION_6_8,
+            MIGRATION_5_8,
+            MIGRATION_4_8,
+            MIGRATION_3_8,
+            MIGRATION_2_8,
+            MIGRATION_1_8
         )
     }
 }

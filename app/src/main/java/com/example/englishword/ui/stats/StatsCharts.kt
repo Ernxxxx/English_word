@@ -604,7 +604,7 @@ fun MasteryDonutChart(
                     isAntiAlias = true
                 }
                 drawText(
-                    "words",
+                    "語",
                     center.x,
                     center.y + centerLargeTextSizePx * 0.1f + centerSmallTextSizePx * 1.5f,
                     labelPaint
