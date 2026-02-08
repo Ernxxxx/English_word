@@ -9,8 +9,34 @@ import androidx.room.Update
 import com.example.englishword.data.local.entity.Word
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Result of batch query for word count and mastered count per level.
+ */
+data class LevelWordStats(
+    val levelId: Long,
+    val wordCount: Int,
+    val masteredCount: Int
+)
+
+/**
+ * Result of mastery distribution query for statistics screen.
+ */
+data class MasteryCount(
+    val masteryLevel: Int,
+    val count: Int
+)
+
 @Dao
 interface WordDao {
+
+    @Query("""
+        SELECT levelId,
+               COUNT(*) as wordCount,
+               SUM(CASE WHEN masteryLevel >= 5 THEN 1 ELSE 0 END) as masteredCount
+        FROM words
+        GROUP BY levelId
+    """)
+    suspend fun getLevelWordStats(): List<LevelWordStats>
 
     @Query("SELECT * FROM words ORDER BY createdAt DESC")
     fun getAllWords(): Flow<List<Word>>
@@ -111,6 +137,17 @@ interface WordDao {
 
     @Query("SELECT COUNT(*) FROM words WHERE masteryLevel = 5")
     fun getTotalMasteredCount(): Flow<Int>
+
+    // Suspend count queries for statistics screen
+    @Query("SELECT COUNT(*) FROM words")
+    suspend fun getTotalWordCountSync(): Int
+
+    @Query("SELECT COUNT(*) FROM words WHERE masteryLevel >= 5")
+    suspend fun getTotalMasteredCountSync(): Int
+
+    // Mastery distribution for statistics screen
+    @Query("SELECT masteryLevel, COUNT(*) as count FROM words GROUP BY masteryLevel ORDER BY masteryLevel ASC")
+    suspend fun getMasteryDistribution(): List<MasteryCount>
 
     // Update mastery level
     @Query("""

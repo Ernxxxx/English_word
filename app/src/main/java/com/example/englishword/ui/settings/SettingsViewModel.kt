@@ -26,6 +26,7 @@ data class SettingsUiState(
     val soundEnabled: Boolean = true,
     val vibrationEnabled: Boolean = true,
     val isStudyDirectionReversed: Boolean = false,
+    val isQuizMode: Boolean = false,
     val appVersion: String = "1.0.0",
     val isLoading: Boolean = true,
     val error: String? = null
@@ -50,6 +51,7 @@ sealed class SettingsEvent {
     data class SoundEnabledChanged(val enabled: Boolean) : SettingsEvent()
     data class VibrationEnabledChanged(val enabled: Boolean) : SettingsEvent()
     data class StudyDirectionReversedChanged(val reversed: Boolean) : SettingsEvent()
+    data class StudyModeChanged(val isQuizMode: Boolean) : SettingsEvent()
     object ClearError : SettingsEvent()
 }
 
@@ -71,27 +73,40 @@ class SettingsViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true) }
 
             try {
-                // Combine all settings flows
-                combine(
+                // Combine first 5 flows
+                val firstGroup = combine(
                     settingsRepository.isPremium(),
                     settingsRepository.getDailyGoal(),
                     settingsRepository.isNotificationEnabled(),
                     settingsRepository.getNotificationTime(),
-                    settingsRepository.getDarkMode(),
+                    settingsRepository.getDarkMode()
+                ) { isPremium, dailyGoal, notifEnabled, notifTime, darkMode ->
+                    listOf(isPremium, dailyGoal, notifEnabled, notifTime, darkMode)
+                }
+
+                // Combine remaining flows
+                val secondGroup = combine(
                     settingsRepository.isSoundEnabled(),
                     settingsRepository.isVibrationEnabled(),
-                    settingsRepository.isStudyDirectionReversed()
-                ) { values ->
+                    settingsRepository.isStudyDirectionReversed(),
+                    settingsRepository.isQuizMode()
+                ) { soundEnabled, vibrationEnabled, isReversed, isQuizMode ->
+                    listOf(soundEnabled, vibrationEnabled, isReversed, isQuizMode)
+                }
+
+                // Combine both groups
+                combine(firstGroup, secondGroup) { first, second ->
                     @Suppress("UNCHECKED_CAST")
                     SettingsUiState(
-                        isPremium = values[0] as Boolean,
-                        dailyGoal = values[1] as Int,
-                        isNotificationEnabled = values[2] as Boolean,
-                        notificationTime = values[3] as String,
-                        darkMode = values[4] as String,
-                        soundEnabled = values[5] as Boolean,
-                        vibrationEnabled = values[6] as Boolean,
-                        isStudyDirectionReversed = values[7] as Boolean,
+                        isPremium = first[0] as Boolean,
+                        dailyGoal = first[1] as Int,
+                        isNotificationEnabled = first[2] as Boolean,
+                        notificationTime = first[3] as String,
+                        darkMode = first[4] as String,
+                        soundEnabled = second[0] as Boolean,
+                        vibrationEnabled = second[1] as Boolean,
+                        isStudyDirectionReversed = second[2] as Boolean,
+                        isQuizMode = second[3] as Boolean,
                         isLoading = false
                     )
                 }.collectLatest { state ->
@@ -127,6 +142,9 @@ class SettingsViewModel @Inject constructor(
             }
             is SettingsEvent.StudyDirectionReversedChanged -> {
                 updateStudyDirectionReversed(event.reversed)
+            }
+            is SettingsEvent.StudyModeChanged -> {
+                updateStudyMode(event.isQuizMode)
             }
             SettingsEvent.ClearError -> {
                 _uiState.update { it.copy(error = null) }
@@ -229,6 +247,24 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val success = settingsRepository.setStudyDirectionReversed(reversed)
+                if (!success) {
+                    _uiState.update { it.copy(error = "保存に失敗しました") }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "保存に失敗しました") }
+            }
+        }
+    }
+
+    private fun updateStudyMode(isQuizMode: Boolean) {
+        viewModelScope.launch {
+            try {
+                val mode = if (isQuizMode) {
+                    SettingsRepository.STUDY_MODE_QUIZ
+                } else {
+                    SettingsRepository.STUDY_MODE_FLASHCARD
+                }
+                val success = settingsRepository.setStudyMode(mode)
                 if (!success) {
                     _uiState.update { it.copy(error = "保存に失敗しました") }
                 }

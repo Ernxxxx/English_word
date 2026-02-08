@@ -8,6 +8,7 @@ import com.example.englishword.ads.AdManager
 import com.example.englishword.data.repository.SettingsRepository
 import com.example.englishword.data.repository.StudyRepository
 import com.example.englishword.data.repository.UnlockRepository
+import com.example.englishword.data.local.dao.LevelWordStats
 import com.example.englishword.data.repository.WordRepository
 import com.example.englishword.domain.model.LevelWithProgress
 import com.example.englishword.domain.model.ParentLevelWithChildren
@@ -20,7 +21,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -76,9 +76,12 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                     .collect { data ->
+                        // Fetch all level word stats in a single query (fixes N+1)
+                        val statsMap = wordRepository.getLevelWordStats()
+
                         // Build hierarchical structure
                         val parentLevelsWithChildren = data.levels.map { parentLevel ->
-                            buildParentWithChildren(parentLevel, data.isPremium)
+                            buildParentWithChildren(parentLevel, data.isPremium, statsMap)
                         }
 
                         // Also create flat list for backward compatibility
@@ -113,14 +116,19 @@ class HomeViewModel @Inject constructor(
 
     /**
      * Build parent level with its children and progress.
+     * Uses pre-fetched statsMap to avoid N+1 queries.
      */
-    private suspend fun buildParentWithChildren(parentLevel: Level, isPremium: Boolean): ParentLevelWithChildren {
+    private suspend fun buildParentWithChildren(
+        parentLevel: Level,
+        isPremium: Boolean,
+        statsMap: Map<Long, LevelWordStats>
+    ): ParentLevelWithChildren {
         val childLevels = levelRepository.getChildLevelsSync(parentLevel.id)
         val childrenWithProgress = childLevels.map { childLevel ->
-            loadLevelProgress(childLevel, isPremium)
+            loadLevelProgress(childLevel, isPremium, statsMap)
         }
 
-        val parentWithProgress = loadLevelProgress(parentLevel, isPremium)
+        val parentWithProgress = loadLevelProgress(parentLevel, isPremium, statsMap)
 
         return ParentLevelWithChildren(
             parentLevel = parentWithProgress,
@@ -150,10 +158,16 @@ class HomeViewModel @Inject constructor(
 
     /**
      * Load progress information for a level.
+     * Uses pre-fetched statsMap to avoid individual queries per level.
      */
-    private suspend fun loadLevelProgress(level: Level, isPremium: Boolean): LevelWithProgress {
-        val wordCount = wordRepository.getWordCountByLevel(level.id).first()
-        val masteredCount = wordRepository.getMasteredCountByLevel(level.id).first()
+    private suspend fun loadLevelProgress(
+        level: Level,
+        isPremium: Boolean,
+        statsMap: Map<Long, LevelWordStats>
+    ): LevelWithProgress {
+        val stats = statsMap[level.id]
+        val wordCount = stats?.wordCount ?: 0
+        val masteredCount = stats?.masteredCount ?: 0
 
         // Check if this is a child level (unit) and needs unlock check
         val isParentLevel = level.parentId == null

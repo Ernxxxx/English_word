@@ -1,6 +1,8 @@
 package com.example.englishword.data.repository
 
 import android.util.Log
+import com.example.englishword.data.local.dao.LevelWordStats
+import com.example.englishword.data.local.dao.MasteryCount
 import com.example.englishword.data.local.dao.WordDao
 import com.example.englishword.data.local.entity.Word
 import kotlinx.coroutines.flow.Flow
@@ -46,6 +48,18 @@ class WordRepository @Inject constructor(
                 Log.e(TAG, "getWordsByLevel failed", e)
                 emit(emptyList())
             }
+    }
+
+    /**
+     * Get all words for a specific level synchronously.
+     */
+    suspend fun getWordsByLevelSync(levelId: Long): List<Word> {
+        return try {
+            wordDao.getWordsByLevelSync(levelId)
+        } catch (e: Exception) {
+            Log.e(TAG, "getWordsByLevelSync failed", e)
+            emptyList()
+        }
     }
 
     /**
@@ -102,6 +116,21 @@ class WordRepository @Inject constructor(
             }
     }
 
+    // ==================== Batch Count Operations ====================
+
+    /**
+     * Get word count and mastered count for all levels in a single query.
+     * Returns a map of levelId to LevelWordStats.
+     */
+    suspend fun getLevelWordStats(): Map<Long, LevelWordStats> {
+        return try {
+            wordDao.getLevelWordStats().associateBy { it.levelId }
+        } catch (e: Exception) {
+            Log.e(TAG, "getLevelWordStats failed", e)
+            emptyMap()
+        }
+    }
+
     // ==================== Count Operations ====================
 
     /**
@@ -135,6 +164,45 @@ class WordRepository @Inject constructor(
                 Log.e(TAG, "getTotalMasteredCount failed", e)
                 emit(0)
             }
+    }
+
+    // ==================== Suspend Count Operations (for Statistics Screen) ====================
+
+    /**
+     * Get total word count synchronously.
+     */
+    suspend fun getTotalWordCountSync(): Int {
+        return try {
+            wordDao.getTotalWordCountSync()
+        } catch (e: Exception) {
+            Log.e(TAG, "getTotalWordCountSync failed", e)
+            0
+        }
+    }
+
+    /**
+     * Get total mastered word count synchronously.
+     */
+    suspend fun getTotalMasteredCountSync(): Int {
+        return try {
+            wordDao.getTotalMasteredCountSync()
+        } catch (e: Exception) {
+            Log.e(TAG, "getTotalMasteredCountSync failed", e)
+            0
+        }
+    }
+
+    /**
+     * Get mastery level distribution for the statistics screen.
+     * Returns a list of MasteryCount with masteryLevel and count.
+     */
+    suspend fun getMasteryDistribution(): List<MasteryCount> {
+        return try {
+            wordDao.getMasteryDistribution()
+        } catch (e: Exception) {
+            Log.e(TAG, "getMasteryDistribution failed", e)
+            emptyList()
+        }
     }
 
     /**

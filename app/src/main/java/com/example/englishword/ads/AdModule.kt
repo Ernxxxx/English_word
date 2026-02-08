@@ -2,11 +2,13 @@ package com.example.englishword.ads
 
 import android.content.Context
 import com.example.englishword.data.repository.SettingsRepository
+import com.example.englishword.di.ApplicationScope
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
 import javax.inject.Singleton
 
 /**
@@ -23,20 +25,10 @@ object AdModule {
     @Singleton
     fun provideAdManager(
         @ApplicationContext context: Context,
-        settingsRepository: SettingsRepository
+        settingsRepository: SettingsRepository,
+        @ApplicationScope applicationScope: CoroutineScope
     ): AdManager {
-        return AdManager(context, settingsRepository)
+        return AdManager(context, settingsRepository, applicationScope)
     }
 
-    /**
-     * Provides the InterstitialAdManager singleton.
-     */
-    @Provides
-    @Singleton
-    fun provideInterstitialAdManager(
-        @ApplicationContext context: Context,
-        settingsRepository: SettingsRepository
-    ): InterstitialAdManager {
-        return InterstitialAdManager(context, settingsRepository)
-    }
 }

@@ -28,7 +28,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +40,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.englishword.data.local.entity.Word
 import com.example.englishword.ui.components.EvaluationButtons
 import com.example.englishword.ui.components.FlashCard
+import com.example.englishword.ui.quiz.QuizContent
+import com.example.englishword.ui.quiz.QuizOptions
 import com.example.englishword.ui.theme.EnglishWordTheme
 import com.example.englishword.ui.theme.MasteryLevel1
 import com.example.englishword.ui.theme.MasteryLevel2
@@ -59,7 +61,9 @@ fun StudyScreen(
     modifier: Modifier = Modifier,
     viewModel: StudyViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isTtsReady by viewModel.ttsManager.isReady.collectAsStateWithLifecycle()
+    val isTtsSpeaking by viewModel.ttsManager.isSpeaking.collectAsStateWithLifecycle()
 
     // Load words when screen is first displayed
     LaunchedEffect(levelId) {
@@ -80,6 +84,11 @@ fun StudyScreen(
         onEvaluate = viewModel::evaluateWord,
         onToggleDirection = viewModel::toggleDirection,
         onNavigateBack = onNavigateBack,
+        onSelectQuizAnswer = viewModel::selectQuizAnswer,
+        onNextQuizWord = viewModel::nextQuizWord,
+        onSpeakWord = viewModel::speakWord,
+        isTtsReady = isTtsReady,
+        isTtsSpeaking = isTtsSpeaking,
         modifier = modifier
     )
 }
@@ -95,6 +104,11 @@ private fun StudyScreenContent(
     onEvaluate: (EvaluationResult) -> Unit,
     onToggleDirection: () -> Unit,
     onNavigateBack: () -> Unit,
+    onSelectQuizAnswer: (Int) -> Unit = {},
+    onNextQuizWord: () -> Unit = {},
+    onSpeakWord: () -> Unit = {},
+    isTtsReady: Boolean = false,
+    isTtsSpeaking: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -120,7 +134,12 @@ private fun StudyScreenContent(
                     StudyingContent(
                         state = uiState,
                         onFlipCard = onFlipCard,
-                        onEvaluate = onEvaluate
+                        onEvaluate = onEvaluate,
+                        onSelectQuizAnswer = onSelectQuizAnswer,
+                        onNextQuizWord = onNextQuizWord,
+                        onSpeakWord = onSpeakWord,
+                        isTtsReady = isTtsReady,
+                        isTtsSpeaking = isTtsSpeaking
                     )
                 }
                 is StudyUiState.Completed -> {
@@ -230,60 +249,55 @@ private fun LoadingContent() {
 }
 
 /**
- * Active studying content with flash card and evaluation buttons.
+ * Active studying content with flash card and evaluation buttons,
+ * or quiz mode content.
  */
 @Composable
 private fun StudyingContent(
     state: StudyUiState.Studying,
     onFlipCard: () -> Unit,
-    onEvaluate: (EvaluationResult) -> Unit
+    onEvaluate: (EvaluationResult) -> Unit,
+    onSelectQuizAnswer: (Int) -> Unit = {},
+    onNextQuizWord: () -> Unit = {},
+    onSpeakWord: () -> Unit = {},
+    isTtsReady: Boolean = false,
+    isTtsSpeaking: Boolean = false
 ) {
     val currentWord = state.currentWord ?: return
 
+    // Quiz mode rendering
+    if (state.isQuizMode && state.quizOptions != null) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            // Mastery info row (same as flashcard mode)
+            MasteryInfoRow(currentWord = currentWord)
+
+            // Quiz content
+            QuizContent(
+                word = currentWord,
+                quizOptions = state.quizOptions,
+                selectedIndex = state.selectedAnswerIndex,
+                isAnswered = state.isQuizAnswered,
+                onSelectAnswer = onSelectQuizAnswer,
+                onNext = onNextQuizWord,
+                isReversed = state.isReversed,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        return
+    }
+
+    // Flashcard mode rendering (existing behavior)
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
         // Mastery info row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val masteryLevel = currentWord.masteryLevel
-            val masteryColor = getMasteryColor(masteryLevel)
-            val masteryLabel = when (masteryLevel) {
-                0 -> "新規"
-                1 -> "1/5"
-                2 -> "2/5"
-                3 -> "3/5"
-                4 -> "4/5"
-                5 -> "完璧"
-                else -> "$masteryLevel/5"
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "習熟度",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.size(6.dp))
-                Text(
-                    text = masteryLabel,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = masteryColor
-                )
-            }
-            Text(
-                text = "復習 ${currentWord.reviewCount}回",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        MasteryInfoRow(currentWord = currentWord)
 
         // Flash card - fixed height
         FlashCard(
@@ -291,6 +305,9 @@ private fun StudyingContent(
             isFlipped = state.isFlipped,
             onFlip = onFlipCard,
             isReversed = state.isReversed,
+            onSpeakClick = onSpeakWord,
+            isTtsReady = isTtsReady,
+            isSpeaking = isTtsSpeaking,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -322,6 +339,52 @@ private fun StudyingContent(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+/**
+ * Mastery info row showing mastery level and review count.
+ * Shared between flashcard and quiz modes.
+ */
+@Composable
+private fun MasteryInfoRow(currentWord: Word) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val masteryLevel = currentWord.masteryLevel
+        val masteryColor = getMasteryColor(masteryLevel)
+        val masteryLabel = when (masteryLevel) {
+            0 -> "新規"
+            1 -> "1/5"
+            2 -> "2/5"
+            3 -> "3/5"
+            4 -> "4/5"
+            5 -> "完璧"
+            else -> "$masteryLevel/5"
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "習熟度",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.size(6.dp))
+            Text(
+                text = masteryLabel,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = masteryColor
+            )
+        }
+        Text(
+            text = "復習 ${currentWord.reviewCount}回",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -425,6 +488,39 @@ private fun StudyScreenFlippedPreview() {
             onEvaluate = {},
             onToggleDirection = {},
             onNavigateBack = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun StudyScreenQuizPreview() {
+    EnglishWordTheme {
+        StudyScreenContent(
+            uiState = StudyUiState.Studying(
+                words = listOf(
+                    Word(
+                        id = 1,
+                        levelId = 1,
+                        english = "Accomplish",
+                        japanese = "達成する"
+                    )
+                ),
+                currentIndex = 0,
+                isFlipped = false,
+                sessionId = 1,
+                isQuizMode = true,
+                quizOptions = QuizOptions(
+                    options = listOf("達成する", "獲得する", "蓄積する", "適応する"),
+                    correctIndex = 0
+                )
+            ),
+            onFlipCard = {},
+            onEvaluate = {},
+            onToggleDirection = {},
+            onNavigateBack = {},
+            onSelectQuizAnswer = {},
+            onNextQuizWord = {}
         )
     }
 }

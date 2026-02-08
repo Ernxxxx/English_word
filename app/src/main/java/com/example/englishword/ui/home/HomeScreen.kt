@@ -1,6 +1,11 @@
+@file:OptIn(ExperimentalFoundationApi::class)
+
 package com.example.englishword.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,6 +37,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.AlertDialog
@@ -60,6 +66,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
@@ -90,6 +97,7 @@ import kotlinx.coroutines.flow.collectLatest
  * @param onNavigateToWordList Called when navigating to view word list
  * @param onNavigateToSettings Called when navigating to settings
  * @param onNavigateToPremium Called when navigating to premium screen
+ * @param onNavigateToStats Called when navigating to stats screen
  * @param viewModel The HomeViewModel
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -99,6 +107,7 @@ fun HomeScreen(
     onNavigateToWordList: (Long) -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToPremium: () -> Unit,
+    onNavigateToStats: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -139,16 +148,22 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "English Word",
+                        text = "英単語帳",
                         fontWeight = FontWeight.Bold
                     )
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToStats) {
+                        Icon(
+                            imageVector = Icons.Default.BarChart,
+                            contentDescription = "統計"
+                        )
+                    }
                     if (!uiState.isPremium) {
                         IconButton(onClick = onNavigateToPremium) {
                             Icon(
                                 imageVector = Icons.Outlined.Star,
-                                contentDescription = "Premium",
+                                contentDescription = "プレミアム",
                                 tint = PremiumGold
                             )
                         }
@@ -279,7 +294,10 @@ private fun HomeContent(
                         levelWithProgress = childLevel,
                         onClick = { onLevelClick(childLevel) },
                         onWordListClick = { onWordListClick(childLevel) },
-                        onUnlockClick = { onUnlockClick(childLevel.level.id) }
+                        onUnlockClick = { onUnlockClick(childLevel.level.id) },
+                        modifier = Modifier.animateItemPlacement(
+                            animationSpec = tween(300)
+                        )
                     )
                 }
             }
@@ -417,6 +435,12 @@ private fun ParentLevelCard(
     parentWithChildren: ParentLevelWithChildren,
     onClick: () -> Unit
 ) {
+    val rotationAngle by animateFloatAsState(
+        targetValue = if (parentWithChildren.isExpanded) 90f else 0f,
+        animationSpec = tween(300),
+        label = "expand_rotation"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -433,15 +457,12 @@ private fun ParentLevelCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Expand/Collapse indicator
+            // Expand/Collapse indicator with rotation animation
             Icon(
-                imageVector = if (parentWithChildren.isExpanded) {
-                    Icons.Default.KeyboardArrowDown
-                } else {
-                    Icons.Default.KeyboardArrowRight
-                },
+                imageVector = Icons.Default.KeyboardArrowRight,
                 contentDescription = if (parentWithChildren.isExpanded) "Collapse" else "Expand",
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.rotate(rotationAngle)
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -497,12 +518,13 @@ private fun ChildLevelCard(
     levelWithProgress: LevelWithProgress,
     onClick: () -> Unit,
     onWordListClick: () -> Unit,
-    onUnlockClick: () -> Unit = {}
+    onUnlockClick: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val isLocked = levelWithProgress.isLocked
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(start = 24.dp)
             .clickable {

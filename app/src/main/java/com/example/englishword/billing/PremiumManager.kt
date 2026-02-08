@@ -3,6 +3,7 @@ package com.example.englishword.billing
 import android.app.Activity
 import android.util.Log
 import com.android.billingclient.api.Purchase
+import com.example.englishword.BuildConfig
 import com.example.englishword.data.repository.SettingsRepository
 import com.example.englishword.di.ApplicationScope
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +26,12 @@ class PremiumManager @Inject constructor(
 
     companion object {
         private const val TAG = "PremiumManager"
+
+        // Re-verification window: if the app cannot reach Google Play,
+        // premium access expires after this duration to prevent abuse.
+        // queryPurchasesAsync only returns active subscriptions, so each
+        // successful check renews this window.
+        private const val PREMIUM_CACHE_DURATION_MS = 48L * 60 * 60 * 1000 // 48 hours
     }
 
     // ==================== Premium State ====================
@@ -119,7 +126,7 @@ class PremiumManager @Inject constructor(
      * Updates local settings based on Google Play response.
      */
     suspend fun checkPremiumStatus(): Boolean {
-        Log.d(TAG, "Checking premium status with Google Play...")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Checking premium status with Google Play...")
         _isLoading.value = true
 
         try {
@@ -140,14 +147,15 @@ class PremiumManager @Inject constructor(
                         }
                         savePremiumPurchase(purchase)
                     } else {
-                        // Clear premium if no active subscription found
-                        clearPremiumIfExpired()
+                        // Google Play confirmed no active subscription -- clear immediately
+                        if (BuildConfig.DEBUG) Log.d(TAG, "No active subscription found, clearing premium")
+                        settingsRepository.clearPremium()
                     }
 
                     hasActivePremium
                 },
                 onFailure = { error ->
-                    Log.e(TAG, "Failed to check premium status", error)
+                    if (BuildConfig.DEBUG) Log.e(TAG, "Failed to check premium status", error)
                     // Fall back to local setting on error
                     settingsRepository.isPremiumSync()
                 }
@@ -173,7 +181,7 @@ class PremiumManager @Inject constructor(
      * Launch premium purchase flow.
      */
     suspend fun purchasePremium(activity: Activity): Result<Unit> {
-        Log.d(TAG, "Starting premium purchase...")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Starting premium purchase...")
         _isLoading.value = true
 
         try {
@@ -187,7 +195,7 @@ class PremiumManager @Inject constructor(
      * Restore previous purchases.
      */
     suspend fun restorePurchases(): Boolean {
-        Log.d(TAG, "Restoring purchases...")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Restoring purchases...")
         _isLoading.value = true
 
         try {
@@ -200,17 +208,18 @@ class PremiumManager @Inject constructor(
     // ==================== Private Helpers ====================
 
     private suspend fun onPurchaseSuccess(purchase: Purchase) {
-        Log.d(TAG, "Processing successful purchase: ${purchase.orderId}")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Processing successful purchase: ${purchase.orderId}")
         savePremiumPurchase(purchase)
         _isPremium.value = true
     }
 
     private suspend fun savePremiumPurchase(purchase: Purchase) {
-        Log.d(TAG, "Saving premium purchase to settings...")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Saving premium purchase to settings...")
 
-        // Calculate expiration (subscriptions auto-renew, so we set a far future date)
-        // In production, you would get the actual expiration from Google Play Developer API
-        val expiresAt = System.currentTimeMillis() + (365L * 24 * 60 * 60 * 1000) // 1 year placeholder
+        // queryPurchasesAsync only returns active subscriptions, so if we reach
+        // here the subscription is confirmed active. Set a cache window so premium
+        // stays valid offline until the next re-verification with Google Play.
+        val expiresAt = System.currentTimeMillis() + PREMIUM_CACHE_DURATION_MS
 
         val success = settingsRepository.savePremiumPurchase(
             purchaseToken = purchase.purchaseToken,
@@ -219,9 +228,9 @@ class PremiumManager @Inject constructor(
         )
 
         if (success) {
-            Log.d(TAG, "Premium purchase saved successfully")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Premium purchase saved successfully")
         } else {
-            Log.e(TAG, "Failed to save premium purchase")
+            if (BuildConfig.DEBUG) Log.e(TAG, "Failed to save premium purchase")
             _error.emit("Failed to save purchase information")
         }
     }
@@ -229,7 +238,7 @@ class PremiumManager @Inject constructor(
     private suspend fun clearPremiumIfExpired() {
         // Check if premium has expired based on local settings
         if (settingsRepository.isPremiumExpired()) {
-            Log.d(TAG, "Premium subscription expired, clearing status")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Premium subscription expired, clearing status")
             settingsRepository.clearPremium()
             _isPremium.value = false
         } else if (!settingsRepository.isPremiumSync()) {
@@ -255,7 +264,7 @@ class PremiumManager @Inject constructor(
     suspend fun startTrial(): Boolean {
         val result = settingsRepository.startTrial()
         if (result) {
-            Log.d(TAG, "Free trial started")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Free trial started")
             refreshTrialStatus()
         }
         return result
@@ -273,7 +282,7 @@ class PremiumManager @Inject constructor(
         updatePremiumStatus(paidPremium)
 
         if (_isTrialActive.value) {
-            Log.d(TAG, "Trial active: ${_trialDaysRemaining.value} days remaining")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Trial active: ${_trialDaysRemaining.value} days remaining")
         }
     }
 

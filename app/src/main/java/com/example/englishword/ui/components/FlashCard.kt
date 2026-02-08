@@ -7,15 +7,23 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +50,10 @@ fun FlashCard(
     isFlipped: Boolean,
     onFlip: () -> Unit,
     modifier: Modifier = Modifier,
-    isReversed: Boolean = false
+    isReversed: Boolean = false,
+    onSpeakClick: (() -> Unit)? = null,
+    isTtsReady: Boolean = false,
+    isSpeaking: Boolean = false
 ) {
     // Animation for the flip effect
     val rotation by animateFloatAsState(
@@ -77,19 +88,31 @@ fun FlashCard(
                 if (isReversed) {
                     FlashCardJapaneseFront(word = word, modifier = Modifier.fillMaxSize())
                 } else {
-                    FlashCardFront(word = word, modifier = Modifier.fillMaxSize())
+                    FlashCardFront(
+                        word = word,
+                        modifier = Modifier.fillMaxSize(),
+                        onSpeakClick = onSpeakClick,
+                        isTtsReady = isTtsReady,
+                        isSpeaking = isSpeaking
+                    )
                 }
             } else {
                 // Back side
                 if (isReversed) {
                     FlashCardEnglishBack(
                         word = word,
-                        modifier = Modifier.fillMaxSize().graphicsLayer { rotationY = 180f }
+                        modifier = Modifier.fillMaxSize().graphicsLayer { rotationY = 180f },
+                        onSpeakClick = onSpeakClick,
+                        isTtsReady = isTtsReady,
+                        isSpeaking = isSpeaking
                     )
                 } else {
                     FlashCardBack(
                         word = word,
-                        modifier = Modifier.fillMaxSize().graphicsLayer { rotationY = 180f }
+                        modifier = Modifier.fillMaxSize().graphicsLayer { rotationY = 180f },
+                        onSpeakClick = onSpeakClick,
+                        isTtsReady = isTtsReady,
+                        isSpeaking = isSpeaking
                     )
                 }
             }
@@ -103,7 +126,10 @@ fun FlashCard(
 @Composable
 private fun FlashCardFront(
     word: Word,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSpeakClick: (() -> Unit)? = null,
+    isTtsReady: Boolean = false,
+    isSpeaking: Boolean = false
 ) {
     Box(
         modifier = modifier.padding(24.dp),
@@ -113,13 +139,36 @@ private fun FlashCardFront(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = word.english,
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = word.english,
+                    style = MaterialTheme.typography.displayMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+
+                if (onSpeakClick != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(
+                        onClick = onSpeakClick,
+                        enabled = isTtsReady,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isSpeaking) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                            contentDescription = "発音",
+                            tint = if (isTtsReady)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -175,7 +224,10 @@ private fun FlashCardJapaneseFront(
 @Composable
 private fun FlashCardEnglishBack(
     word: Word,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSpeakClick: (() -> Unit)? = null,
+    isTtsReady: Boolean = false,
+    isSpeaking: Boolean = false
 ) {
     Box(
         modifier = modifier.padding(24.dp),
@@ -196,13 +248,37 @@ private fun FlashCardEnglishBack(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = word.english,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = word.english,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+
+                if (onSpeakClick != null) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
+                        onClick = onSpeakClick,
+                        enabled = isTtsReady,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isSpeaking) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                            contentDescription = "発音",
+                            tint = if (isTtsReady)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
 
             if (!word.exampleEn.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -230,7 +306,10 @@ private fun FlashCardEnglishBack(
 @Composable
 private fun FlashCardBack(
     word: Word,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSpeakClick: (() -> Unit)? = null,
+    isTtsReady: Boolean = false,
+    isSpeaking: Boolean = false
 ) {
     Box(
         modifier = modifier.padding(24.dp),
@@ -241,14 +320,38 @@ private fun FlashCardBack(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxWidth()
         ) {
-            // English word
-            Text(
-                text = word.english,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center
-            )
+            // English word with speaker button
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = word.english,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+
+                if (onSpeakClick != null) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
+                        onClick = onSpeakClick,
+                        enabled = isTtsReady,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isSpeaking) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                            contentDescription = "発音",
+                            tint = if (isTtsReady)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 

@@ -98,9 +98,9 @@ private fun EvaluationButton(
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = backgroundColor,
-            contentColor = Color.White,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
             disabledContainerColor = backgroundColor.copy(alpha = 0.5f),
-            disabledContentColor = Color.White.copy(alpha = 0.7f)
+            disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
         ),
         elevation = ButtonDefaults.buttonElevation(
             defaultElevation = 1.dp,

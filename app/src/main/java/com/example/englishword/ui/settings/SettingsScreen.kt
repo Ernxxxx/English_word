@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.VolumeUp
@@ -50,7 +51,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,7 +73,7 @@ fun SettingsScreen(
     onNavigateToPremium: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -159,6 +160,19 @@ fun SettingsScreen(
                         checked = uiState.isStudyDirectionReversed,
                         onCheckedChange = {
                             viewModel.onEvent(SettingsEvent.StudyDirectionReversedChanged(it))
+                        }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                    // Study mode (flashcard or quiz)
+                    SwitchListItem(
+                        icon = Icons.Default.Quiz,
+                        title = "学習モード",
+                        subtitle = if (uiState.isQuizMode) "4択クイズ" else "フラッシュカード",
+                        checked = uiState.isQuizMode,
+                        onCheckedChange = {
+                            viewModel.onEvent(SettingsEvent.StudyModeChanged(it))
                         }
                     )
                 }

@@ -11,6 +11,7 @@ import com.example.englishword.data.local.dao.UnitUnlockDao
 import com.example.englishword.data.local.dao.UserSettingsDao
 import com.example.englishword.data.local.dao.UserStatsDao
 import com.example.englishword.data.local.dao.WordDao
+import com.example.englishword.data.local.migration.Migrations
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -34,7 +35,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             DATABASE_NAME
         )
-            .fallbackToDestructiveMigration()
+            .addMigrations(*Migrations.getAllMigrations())
             .build()
     }
 

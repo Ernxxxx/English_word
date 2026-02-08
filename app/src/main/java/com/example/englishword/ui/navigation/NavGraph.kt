@@ -1,5 +1,12 @@
 package com.example.englishword.ui.navigation
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -12,6 +19,7 @@ import com.example.englishword.ui.home.HomeScreen
 import com.example.englishword.ui.onboarding.OnboardingScreen
 import com.example.englishword.ui.settings.PremiumScreen
 import com.example.englishword.ui.settings.SettingsScreen
+import com.example.englishword.ui.stats.StatsScreen
 import com.example.englishword.ui.study.StudyResultScreen
 import com.example.englishword.ui.study.StudyScreen
 import com.example.englishword.ui.word.WordEditScreen
@@ -29,6 +37,7 @@ object Routes {
     const val WORD_EDIT = "wordEdit/{levelId}?wordId={wordId}"
     const val SETTINGS = "settings"
     const val PREMIUM = "premium"
+    const val STATS = "stats"
 
     // Helper functions to create routes with arguments
     fun study(levelId: Long): String = "study/$levelId"
@@ -67,7 +76,11 @@ fun EnglishWordNavHost(
         modifier = modifier
     ) {
         // Onboarding screen
-        composable(Routes.ONBOARDING) {
+        composable(
+            route = Routes.ONBOARDING,
+            enterTransition = { fadeIn(tween(500)) },
+            exitTransition = { fadeOut(tween(300)) }
+        ) {
             OnboardingScreen(
                 onNavigateToHome = {
                     navController.navigate(Routes.HOME) {
@@ -78,7 +91,13 @@ fun EnglishWordNavHost(
         }
 
         // Home screen
-        composable(Routes.HOME) {
+        composable(
+            route = Routes.HOME,
+            enterTransition = { fadeIn(tween(300)) },
+            exitTransition = { slideOutHorizontally(tween(300)) { -it / 3 } + fadeOut(tween(150)) },
+            popEnterTransition = { slideInHorizontally(tween(300)) { -it / 3 } + fadeIn(tween(300)) },
+            popExitTransition = { fadeOut(tween(300)) }
+        ) {
             HomeScreen(
                 onNavigateToStudy = { levelId ->
                     navController.navigate(Routes.study(levelId))
@@ -91,6 +110,9 @@ fun EnglishWordNavHost(
                 },
                 onNavigateToPremium = {
                     navController.navigate(Routes.PREMIUM)
+                },
+                onNavigateToStats = {
+                    navController.navigate(Routes.STATS)
                 }
             )
         }
@@ -98,6 +120,10 @@ fun EnglishWordNavHost(
         // Study screen
         composable(
             route = Routes.STUDY,
+            enterTransition = { slideInHorizontally(tween(300)) { it } + fadeIn(tween(300)) },
+            exitTransition = { slideOutHorizontally(tween(300)) { -it / 3 } + fadeOut(tween(150)) },
+            popEnterTransition = { slideInHorizontally(tween(300)) { -it / 3 } + fadeIn(tween(300)) },
+            popExitTransition = { slideOutHorizontally(tween(300)) { it } + fadeOut(tween(150)) },
             arguments = listOf(
                 navArgument(NavArgs.LEVEL_ID) {
                     type = NavType.LongType
@@ -121,6 +147,10 @@ fun EnglishWordNavHost(
         // Study result screen
         composable(
             route = Routes.STUDY_RESULT,
+            enterTransition = { slideInHorizontally(tween(300)) { it } + fadeIn(tween(300)) },
+            exitTransition = { slideOutHorizontally(tween(300)) { -it / 3 } + fadeOut(tween(150)) },
+            popEnterTransition = { slideInHorizontally(tween(300)) { -it / 3 } + fadeIn(tween(300)) },
+            popExitTransition = { slideOutHorizontally(tween(300)) { it } + fadeOut(tween(150)) },
             arguments = listOf(
                 navArgument(NavArgs.SESSION_ID) {
                     type = NavType.LongType
@@ -150,6 +180,10 @@ fun EnglishWordNavHost(
         // Word list screen
         composable(
             route = Routes.WORD_LIST,
+            enterTransition = { slideInHorizontally(tween(300)) { it } + fadeIn(tween(300)) },
+            exitTransition = { slideOutHorizontally(tween(300)) { -it / 3 } + fadeOut(tween(150)) },
+            popEnterTransition = { slideInHorizontally(tween(300)) { -it / 3 } + fadeIn(tween(300)) },
+            popExitTransition = { slideOutHorizontally(tween(300)) { it } + fadeOut(tween(150)) },
             arguments = listOf(
                 navArgument(NavArgs.LEVEL_ID) {
                     type = NavType.LongType
@@ -168,6 +202,10 @@ fun EnglishWordNavHost(
         // Word edit screen (create or edit)
         composable(
             route = Routes.WORD_EDIT,
+            enterTransition = { slideInHorizontally(tween(300)) { it } + fadeIn(tween(300)) },
+            exitTransition = { slideOutHorizontally(tween(300)) { -it / 3 } + fadeOut(tween(150)) },
+            popEnterTransition = { slideInHorizontally(tween(300)) { -it / 3 } + fadeIn(tween(300)) },
+            popExitTransition = { slideOutHorizontally(tween(300)) { it } + fadeOut(tween(150)) },
             arguments = listOf(
                 navArgument(NavArgs.LEVEL_ID) {
                     type = NavType.LongType
@@ -192,7 +230,13 @@ fun EnglishWordNavHost(
         }
 
         // Settings screen
-        composable(Routes.SETTINGS) {
+        composable(
+            route = Routes.SETTINGS,
+            enterTransition = { slideInVertically(tween(300)) { it / 2 } + fadeIn(tween(300)) },
+            exitTransition = { fadeOut(tween(150)) },
+            popEnterTransition = { fadeIn(tween(300)) },
+            popExitTransition = { slideOutVertically(tween(300)) { it / 2 } + fadeOut(tween(150)) }
+        ) {
             SettingsScreen(
                 onNavigateBack = {
                     navController.popBackStack()
@@ -204,47 +248,33 @@ fun EnglishWordNavHost(
         }
 
         // Premium screen
-        composable(Routes.PREMIUM) {
+        composable(
+            route = Routes.PREMIUM,
+            enterTransition = { slideInVertically(tween(300)) { it / 2 } + fadeIn(tween(300)) },
+            exitTransition = { fadeOut(tween(150)) },
+            popEnterTransition = { fadeIn(tween(300)) },
+            popExitTransition = { slideOutVertically(tween(300)) { it / 2 } + fadeOut(tween(150)) }
+        ) {
             PremiumScreen(
                 onNavigateBack = {
                     navController.popBackStack()
                 }
             )
         }
+
+        // Stats screen
+        composable(
+            route = Routes.STATS,
+            enterTransition = { slideInHorizontally(tween(300)) { it } + fadeIn(tween(300)) },
+            exitTransition = { slideOutHorizontally(tween(300)) { -it / 3 } + fadeOut(tween(150)) },
+            popEnterTransition = { slideInHorizontally(tween(300)) { -it / 3 } + fadeIn(tween(300)) },
+            popExitTransition = { slideOutHorizontally(tween(300)) { it } + fadeOut(tween(150)) }
+        ) {
+            StatsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
     }
-}
-
-/**
- * Navigation helper extension functions
- */
-fun NavHostController.navigateToHome() {
-    navigate(Routes.HOME) {
-        popUpTo(Routes.ONBOARDING) { inclusive = true }
-    }
-}
-
-fun NavHostController.navigateToStudy(levelId: Long) {
-    navigate(Routes.study(levelId))
-}
-
-fun NavHostController.navigateToStudyResult(sessionId: Long) {
-    navigate(Routes.studyResult(sessionId)) {
-        popUpTo(Routes.HOME)
-    }
-}
-
-fun NavHostController.navigateToWordList(levelId: Long) {
-    navigate(Routes.wordList(levelId))
-}
-
-fun NavHostController.navigateToWordEdit(levelId: Long, wordId: Long? = null) {
-    navigate(Routes.wordEdit(levelId, wordId))
-}
-
-fun NavHostController.navigateToSettings() {
-    navigate(Routes.SETTINGS)
-}
-
-fun NavHostController.navigateToPremium() {
-    navigate(Routes.PREMIUM)
 }
