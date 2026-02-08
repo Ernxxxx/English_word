@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.englishword.MainActivity
 import com.example.englishword.R
+import com.example.englishword.util.CrashReporter
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,7 +20,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class NotificationHelper @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val crashReporter: CrashReporter
 ) {
     companion object {
         const val CHANNEL_ID = "daily_reminder"
@@ -84,7 +86,7 @@ class NotificationHelper @Inject constructor(
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
         } catch (e: SecurityException) {
             // Permission not granted
-            e.printStackTrace()
+            crashReporter.recordException(e)
         }
     }
 

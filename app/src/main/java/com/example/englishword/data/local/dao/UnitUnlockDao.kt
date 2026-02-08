@@ -22,6 +22,9 @@ interface UnitUnlockDao {
     @Query("SELECT * FROM unit_unlocks")
     suspend fun getAllUnlocksSync(): List<UnitUnlock>
 
+    @Query("SELECT * FROM unit_unlocks WHERE unlockUntil > :currentTime")
+    suspend fun getActiveUnlocks(currentTime: Long): List<UnitUnlock>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(unlock: UnitUnlock)
 

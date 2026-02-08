@@ -12,9 +12,10 @@ import com.example.englishword.util.SrsCalculator
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,7 +35,7 @@ class StudyRepository @Inject constructor(
         private const val TAG = "StudyRepository"
     }
 
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
     // ==================== Session Management ====================
 
@@ -373,7 +374,7 @@ class StudyRepository @Inject constructor(
      */
     private suspend fun updateDailyStats(wordsStudied: Int) {
         try {
-            val today = dateFormat.format(Date())
+            val today = LocalDate.now().format(dateFormatter)
             val existingStats = userStatsDao.getStatsByDateSync(today)
 
             if (existingStats != null) {
@@ -404,15 +405,14 @@ class StudyRepository @Inject constructor(
     }
 
     private fun getYesterdayDate(): String {
-        val yesterday = Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000)
-        return dateFormat.format(yesterday)
+        return LocalDate.now().minusDays(1).format(dateFormatter)
     }
 
     /**
      * Get today's stats.
      */
     fun getTodayStats(): Flow<UserStats?> {
-        val today = dateFormat.format(Date())
+        val today = LocalDate.now().format(dateFormatter)
         return userStatsDao.getStatsByDate(today)
             .catch { e ->
                 Log.e(TAG, "getTodayStats failed", e)

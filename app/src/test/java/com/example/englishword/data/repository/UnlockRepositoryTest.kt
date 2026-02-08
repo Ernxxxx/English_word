@@ -1,5 +1,7 @@
 package com.example.englishword.data.repository
 
+import androidx.room.withTransaction
+import com.example.englishword.data.local.AppDatabase
 import com.example.englishword.data.local.dao.UnitUnlockDao
 import com.example.englishword.data.local.dao.UserSettingsDao
 import com.example.englishword.data.local.entity.UnitUnlock
@@ -7,6 +9,8 @@ import com.example.englishword.data.local.entity.UserSettings
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -19,6 +23,7 @@ import java.util.Locale
 
 class UnlockRepositoryTest {
 
+    private lateinit var database: AppDatabase
     private lateinit var unitUnlockDao: UnitUnlockDao
     private lateinit var userSettingsDao: UserSettingsDao
     private lateinit var repository: UnlockRepository
@@ -33,9 +38,18 @@ class UnlockRepositoryTest {
 
     @Before
     fun setUp() {
+        database = mockk(relaxed = true)
         unitUnlockDao = mockk(relaxed = true)
         userSettingsDao = mockk(relaxed = true)
-        repository = UnlockRepository(unitUnlockDao, userSettingsDao)
+
+        // Mock Room's withTransaction extension to just execute the block directly
+        mockkStatic("androidx.room.RoomDatabaseKt")
+        val blockSlot = slot<suspend () -> Any?>()
+        coEvery { database.withTransaction(capture(blockSlot)) } coAnswers {
+            blockSlot.captured.invoke()
+        }
+
+        repository = UnlockRepository(database, unitUnlockDao, userSettingsDao)
     }
 
     // ==================== isUnitUnlocked() ====================

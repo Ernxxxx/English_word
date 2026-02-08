@@ -7,6 +7,7 @@ import com.example.englishword.ads.AdManager
 import com.example.englishword.data.local.InitialDataSeeder
 import com.example.englishword.data.repository.SettingsRepository
 import com.example.englishword.notification.NotificationScheduler
+import com.example.englishword.util.CrashReporter
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,9 @@ class EnglishWordApp : Application(), Configuration.Provider {
 
     @Inject
     lateinit var settingsRepository: SettingsRepository
+
+    @Inject
+    lateinit var crashReporter: CrashReporter
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -71,7 +75,7 @@ class EnglishWordApp : Application(), Configuration.Provider {
                 notificationScheduler.scheduleFromTimeString(time)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            crashReporter.recordException(e)
         }
     }
 }

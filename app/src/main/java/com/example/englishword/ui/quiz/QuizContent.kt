@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -27,6 +28,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -80,6 +82,7 @@ fun QuizContent(
     isAnswered: Boolean,
     onSelectAnswer: (Int) -> Unit,
     onNext: () -> Unit,
+    onSkip: () -> Unit = {},
     isReversed: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -184,9 +187,23 @@ fun QuizContent(
             }
         }
 
-        // Placeholder for button height when not visible
+        // "Skip" button - shown before answering
         if (!isAnswered) {
-            Spacer(modifier = Modifier.height(56.dp))
+            TextButton(
+                onClick = onSkip,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SkipNext,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "あとで",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))

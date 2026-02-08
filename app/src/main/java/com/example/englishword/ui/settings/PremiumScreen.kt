@@ -25,10 +25,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.widget.Toast
 import com.example.englishword.billing.BillingRepository
 import com.example.englishword.billing.PremiumManager
 import com.example.englishword.ui.theme.PremiumGold
 import com.example.englishword.ui.theme.PremiumOrange
+import com.example.englishword.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,8 +42,12 @@ import javax.inject.Inject
 // ViewModel
 @HiltViewModel
 class PremiumViewModel @Inject constructor(
-    private val premiumManager: PremiumManager
+    private val premiumManager: PremiumManager,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
+
+    /** Exposes current network connectivity state. */
+    val isConnected: StateFlow<Boolean> = networkMonitor.isConnected
 
     private val _uiState = MutableStateFlow(PremiumUiState())
     val uiState: StateFlow<PremiumUiState> = _uiState.asStateFlow()
@@ -174,8 +180,17 @@ fun PremiumScreen(
     viewModel: PremiumViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isConnected by viewModel.isConnected.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context as? Activity
+    var isPurchasing by remember { mutableStateOf(false) }
+
+    // Reset isPurchasing when loading finishes (purchase completed, cancelled, or errored)
+    LaunchedEffect(uiState.isLoading, uiState.error, uiState.purchaseSuccess) {
+        if (!uiState.isLoading) {
+            isPurchasing = false
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -312,13 +327,24 @@ fun PremiumScreen(
                 // Purchase Button
                 Button(
                     onClick = {
-                        activity?.let { viewModel.purchasePremium(it) }
+                        if (!isPurchasing) {
+                            if (!isConnected) {
+                                Toast.makeText(
+                                    context,
+                                    "ネットワークに接続されていません。接続を確認してから再試行してください。",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                return@Button
+                            }
+                            isPurchasing = true
+                            activity?.let { viewModel.purchasePremium(it) }
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
                         .animateContentSize(),
-                    enabled = !uiState.isLoading && activity != null
+                    enabled = !uiState.isLoading && !isPurchasing && activity != null
                 ) {
                     if (uiState.isLoading) {
                         CircularProgressIndicator(

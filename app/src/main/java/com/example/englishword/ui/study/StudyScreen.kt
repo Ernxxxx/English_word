@@ -26,8 +26,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.graphics.Color
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -64,6 +70,32 @@ fun StudyScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isTtsReady by viewModel.ttsManager.isReady.collectAsStateWithLifecycle()
     val isTtsSpeaking by viewModel.ttsManager.isSpeaking.collectAsStateWithLifecycle()
+    var showBackConfirmDialog by remember { mutableStateOf(false) }
+
+    // Back confirmation dialog during study
+    BackHandler(enabled = uiState is StudyUiState.Studying) {
+        showBackConfirmDialog = true
+    }
+
+    if (showBackConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showBackConfirmDialog = false },
+            title = { Text("学習を中断しますか？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showBackConfirmDialog = false
+                    onNavigateBack()
+                }) {
+                    Text("中断する")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBackConfirmDialog = false }) {
+                    Text("続ける")
+                }
+            }
+        )
+    }
 
     // Load words when screen is first displayed
     LaunchedEffect(levelId) {
@@ -86,6 +118,7 @@ fun StudyScreen(
         onNavigateBack = onNavigateBack,
         onSelectQuizAnswer = viewModel::selectQuizAnswer,
         onNextQuizWord = viewModel::nextQuizWord,
+        onQuizSkip = viewModel::quizSkipWord,
         onSpeakWord = viewModel::speakWord,
         isTtsReady = isTtsReady,
         isTtsSpeaking = isTtsSpeaking,
@@ -106,6 +139,7 @@ private fun StudyScreenContent(
     onNavigateBack: () -> Unit,
     onSelectQuizAnswer: (Int) -> Unit = {},
     onNextQuizWord: () -> Unit = {},
+    onQuizSkip: () -> Unit = {},
     onSpeakWord: () -> Unit = {},
     isTtsReady: Boolean = false,
     isTtsSpeaking: Boolean = false,
@@ -137,6 +171,7 @@ private fun StudyScreenContent(
                         onEvaluate = onEvaluate,
                         onSelectQuizAnswer = onSelectQuizAnswer,
                         onNextQuizWord = onNextQuizWord,
+                        onQuizSkip = onQuizSkip,
                         onSpeakWord = onSpeakWord,
                         isTtsReady = isTtsReady,
                         isTtsSpeaking = isTtsSpeaking
@@ -211,7 +246,7 @@ private fun StudyTopAppBar(
             IconButton(onClick = onNavigateBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "戻る"
+                    contentDescription = "学習画面を閉じる"
                 )
             }
         },
@@ -259,6 +294,7 @@ private fun StudyingContent(
     onEvaluate: (EvaluationResult) -> Unit,
     onSelectQuizAnswer: (Int) -> Unit = {},
     onNextQuizWord: () -> Unit = {},
+    onQuizSkip: () -> Unit = {},
     onSpeakWord: () -> Unit = {},
     isTtsReady: Boolean = false,
     isTtsSpeaking: Boolean = false
@@ -283,6 +319,7 @@ private fun StudyingContent(
                 isAnswered = state.isQuizAnswered,
                 onSelectAnswer = onSelectQuizAnswer,
                 onNext = onNextQuizWord,
+                onSkip = onQuizSkip,
                 isReversed = state.isReversed,
                 modifier = Modifier.weight(1f)
             )

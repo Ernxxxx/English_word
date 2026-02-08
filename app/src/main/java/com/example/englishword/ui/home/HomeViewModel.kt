@@ -79,9 +79,13 @@ class HomeViewModel @Inject constructor(
                         // Fetch all level word stats in a single query (fixes N+1)
                         val statsMap = wordRepository.getLevelWordStats()
 
+                        // Batch-load all unlock data to avoid N+1 queries
+                        val unlockedLevelIds = unlockRepository.getUnlockedLevelIds()
+                        val remainingUnlockTimes = unlockRepository.getRemainingUnlockTimes()
+
                         // Build hierarchical structure
                         val parentLevelsWithChildren = data.levels.map { parentLevel ->
-                            buildParentWithChildren(parentLevel, data.isPremium, statsMap)
+                            buildParentWithChildren(parentLevel, data.isPremium, statsMap, unlockedLevelIds, remainingUnlockTimes)
                         }
 
                         // Also create flat list for backward compatibility
@@ -116,19 +120,21 @@ class HomeViewModel @Inject constructor(
 
     /**
      * Build parent level with its children and progress.
-     * Uses pre-fetched statsMap to avoid N+1 queries.
+     * Uses pre-fetched statsMap and unlock data to avoid N+1 queries.
      */
     private suspend fun buildParentWithChildren(
         parentLevel: Level,
         isPremium: Boolean,
-        statsMap: Map<Long, LevelWordStats>
+        statsMap: Map<Long, LevelWordStats>,
+        unlockedLevelIds: Set<Long>,
+        remainingUnlockTimes: Map<Long, Long>
     ): ParentLevelWithChildren {
         val childLevels = levelRepository.getChildLevelsSync(parentLevel.id)
         val childrenWithProgress = childLevels.map { childLevel ->
-            loadLevelProgress(childLevel, isPremium, statsMap)
+            loadLevelProgress(childLevel, isPremium, statsMap, unlockedLevelIds, remainingUnlockTimes)
         }
 
-        val parentWithProgress = loadLevelProgress(parentLevel, isPremium, statsMap)
+        val parentWithProgress = loadLevelProgress(parentLevel, isPremium, statsMap, unlockedLevelIds, remainingUnlockTimes)
 
         return ParentLevelWithChildren(
             parentLevel = parentWithProgress,
@@ -158,12 +164,15 @@ class HomeViewModel @Inject constructor(
 
     /**
      * Load progress information for a level.
-     * Uses pre-fetched statsMap to avoid individual queries per level.
+     * Uses pre-fetched statsMap, unlockedLevelIds, and remainingUnlockTimes
+     * to avoid N+1 queries (no individual DB calls per level).
      */
-    private suspend fun loadLevelProgress(
+    private fun loadLevelProgress(
         level: Level,
         isPremium: Boolean,
-        statsMap: Map<Long, LevelWordStats>
+        statsMap: Map<Long, LevelWordStats>,
+        unlockedLevelIds: Set<Long>,
+        remainingUnlockTimes: Map<Long, Long>
     ): LevelWithProgress {
         val stats = statsMap[level.id]
         val wordCount = stats?.wordCount ?: 0
@@ -174,10 +183,10 @@ class HomeViewModel @Inject constructor(
         val isLocked = if (isPremium || isParentLevel) {
             false
         } else {
-            !unlockRepository.isUnitUnlocked(level.id, isPremium, isParentLevel)
+            level.id !in unlockedLevelIds
         }
 
-        val remainingTime = if (isLocked) 0L else unlockRepository.getRemainingUnlockTime(level.id)
+        val remainingTime = if (isLocked) 0L else (remainingUnlockTimes[level.id] ?: 0L)
 
         return LevelWithProgress(
             level = com.example.englishword.domain.model.Level(

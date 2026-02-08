@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.delay
 import kotlin.coroutines.resume
 
 /**
@@ -30,6 +31,18 @@ class BillingClientWrapper(
         // Reconnection settings
         private const val MAX_RECONNECT_ATTEMPTS = 3
         private const val RECONNECT_DELAY_MS = 1000L
+
+        // Retry settings for transient billing errors
+        private const val MAX_QUERY_RETRIES = 3
+        private const val INITIAL_RETRY_DELAY_MS = 1000L
+        private const val RETRY_BACKOFF_MULTIPLIER = 2.0
+
+        // Transient billing error codes that are worth retrying
+        private val TRANSIENT_ERROR_CODES = setOf(
+            BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE,   // 2
+            BillingClient.BillingResponseCode.SERVICE_DISCONNECTED,  // -1
+            BillingClient.BillingResponseCode.ERROR                  // 6
+        )
     }
 
     // BillingClient instance
@@ -174,7 +187,9 @@ class BillingClientWrapper(
     // ==================== Product Details ====================
 
     /**
-     * Query product details for subscriptions.
+     * Query product details for subscriptions with retry logic for transient errors.
+     * Retries up to MAX_QUERY_RETRIES times with exponential backoff for
+     * SERVICE_UNAVAILABLE, SERVICE_DISCONNECTED, and generic ERROR responses.
      */
     suspend fun querySubscriptionProductDetails(
         productIds: List<String> = listOf(PRODUCT_ID_PREMIUM_MONTHLY)
@@ -194,32 +209,65 @@ class BillingClientWrapper(
             .setProductList(productList)
             .build()
 
-        return suspendCancellableCoroutine { continuation ->
-            billingClient.queryProductDetailsAsync(params) { billingResult, productDetailsList ->
-                when (billingResult.responseCode) {
-                    BillingClient.BillingResponseCode.OK -> {
-                        if (BuildConfig.DEBUG) Log.d(TAG, "Product details query successful: ${productDetailsList.size} products")
+        var lastException: BillingException? = null
 
-                        // Cache the product details
-                        val detailsMap = productDetailsList.associateBy { it.productId }
-                        _productDetails.value = _productDetails.value + detailsMap
+        for (attempt in 0 until MAX_QUERY_RETRIES) {
+            if (attempt > 0) {
+                val delayMs = (INITIAL_RETRY_DELAY_MS * Math.pow(RETRY_BACKOFF_MULTIPLIER, (attempt - 1).toDouble())).toLong()
+                if (BuildConfig.DEBUG) Log.d(TAG, "Retrying product details query (attempt ${attempt + 1}/$MAX_QUERY_RETRIES) after ${delayMs}ms")
+                delay(delayMs)
 
-                        continuation.resume(Result.success(productDetailsList))
-                    }
-                    else -> {
-                        if (BuildConfig.DEBUG) Log.e(TAG, "Product details query failed: ${billingResult.debugMessage}")
-                        continuation.resume(
-                            Result.failure(
-                                BillingException(
-                                    "Query failed: ${billingResult.debugMessage}",
-                                    billingResult.responseCode
+                // Re-establish connection if needed before retry
+                if (!ensureConnected()) {
+                    return Result.failure(BillingException("Not connected to billing service"))
+                }
+            }
+
+            val result = suspendCancellableCoroutine<Result<List<ProductDetails>>> { continuation ->
+                billingClient.queryProductDetailsAsync(params) { billingResult, productDetailsList ->
+                    when (billingResult.responseCode) {
+                        BillingClient.BillingResponseCode.OK -> {
+                            if (BuildConfig.DEBUG) Log.d(TAG, "Product details query successful: ${productDetailsList.size} products")
+
+                            // Cache the product details
+                            val detailsMap = productDetailsList.associateBy { it.productId }
+                            _productDetails.value = _productDetails.value + detailsMap
+
+                            continuation.resume(Result.success(productDetailsList))
+                        }
+                        else -> {
+                            if (BuildConfig.DEBUG) Log.e(TAG, "Product details query failed (attempt ${attempt + 1}): ${billingResult.debugMessage}")
+                            continuation.resume(
+                                Result.failure(
+                                    BillingException(
+                                        "Query failed: ${billingResult.debugMessage}",
+                                        billingResult.responseCode
+                                    )
                                 )
                             )
-                        )
+                        }
                     }
                 }
             }
+
+            if (result.isSuccess) {
+                return result
+            }
+
+            // Check if the error is transient and worth retrying
+            val exception = result.exceptionOrNull() as? BillingException
+            lastException = exception
+            if (exception != null && exception.responseCode !in TRANSIENT_ERROR_CODES) {
+                // Non-transient error, do not retry
+                if (BuildConfig.DEBUG) Log.e(TAG, "Non-transient billing error (code ${exception.responseCode}), not retrying")
+                return result
+            }
         }
+
+        if (BuildConfig.DEBUG) Log.e(TAG, "All $MAX_QUERY_RETRIES retry attempts exhausted for product details query")
+        return Result.failure(
+            lastException ?: BillingException("Query failed after $MAX_QUERY_RETRIES attempts")
+        )
     }
 
     /**

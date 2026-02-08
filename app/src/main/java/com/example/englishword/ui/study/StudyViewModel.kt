@@ -13,6 +13,7 @@ import com.example.englishword.ui.quiz.QuizGenerator
 import com.example.englishword.ui.quiz.QuizOptions
 import com.example.englishword.util.TtsManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,12 +43,24 @@ class StudyViewModel @Inject constructor(
     private var laterCount = 0
     private var currentLevelId: Long = 0
 
+    // Limit laterQueue recycling to prevent infinite loops
+    private var laterQueueCycleCount = 0
+    private val maxLaterQueueCycles = 3
+
     // Track when card was shown to user (for response time measurement)
     private var cardShownTimestamp: Long = 0L
 
     // Quiz mode: cached words in current level for generating distractors
     private var allWordsInLevel: List<Word> = emptyList()
     private var isQuizMode: Boolean = false
+
+    // Job tracking for quiz answer DB writes (prevents race condition with nextQuizWord)
+    private var lastRecordJob: Job? = null
+
+    override fun onCleared() {
+        ttsManager.stop()
+        super.onCleared()
+    }
 
     /**
      * Load words for study from the specified level.
@@ -81,6 +94,10 @@ class StudyViewModel @Inject constructor(
                 // For quiz mode, pre-load all words in the level for distractor generation
                 if (isQuizMode) {
                     allWordsInLevel = wordRepository.getWordsByLevelSync(levelId)
+                    // Fall back to flashcard mode if not enough unique words for quiz
+                    if (!QuizGenerator.canGenerateQuiz(allWordsInLevel)) {
+                        isQuizMode = false
+                    }
                 }
 
                 // Check for incomplete session to resume
@@ -179,6 +196,7 @@ class StudyViewModel @Inject constructor(
         knownCount = 0
         againCount = 0
         laterCount = 0
+        laterQueueCycleCount = 0
 
         // Start response time tracking
         cardShownTimestamp = System.currentTimeMillis()
@@ -273,30 +291,50 @@ class StudyViewModel @Inject constructor(
                 val newLaterQueue = currentState.laterQueue + currentWord
                 val nextIndex = currentState.currentIndex + 1
 
-                val newState = if (nextIndex < currentState.words.size) {
-                    currentState.copy(
+                if (nextIndex < currentState.words.size) {
+                    val newState = currentState.copy(
                         currentIndex = nextIndex,
                         isFlipped = false,
                         laterQueue = newLaterQueue
                     )
+                    _uiState.value = newState
+
+                    viewModelScope.launch {
+                        studyRepository.recordResult(sessionId, currentWord.id, 1, responseTimeMs)
+                        saveProgress(newState)
+                        cardShownTimestamp = System.currentTimeMillis()
+                    }
                 } else if (newLaterQueue.isNotEmpty()) {
                     // メインリスト終了、laterQueueを新しいリストとして開始
-                    currentState.copy(
+                    laterQueueCycleCount++
+                    if (laterQueueCycleCount > maxLaterQueueCycles) {
+                        viewModelScope.launch {
+                            studyRepository.recordResult(sessionId, currentWord.id, 1, responseTimeMs)
+                        }
+                        forceCompleteSession(sessionId)
+                        return
+                    }
+                    val newState = currentState.copy(
                         words = newLaterQueue,
                         currentIndex = 0,
                         isFlipped = false,
                         laterQueue = emptyList()
                     )
+                    _uiState.value = newState
+
+                    viewModelScope.launch {
+                        studyRepository.recordResult(sessionId, currentWord.id, 1, responseTimeMs)
+                        saveProgress(newState)
+                        cardShownTimestamp = System.currentTimeMillis()
+                    }
                 } else {
                     // ありえないケース（laterQueueに追加直後なので空にはならない）
-                    currentState.copy(isFlipped = false)
-                }
-                _uiState.value = newState
+                    _uiState.value = currentState.copy(isFlipped = false)
 
-                viewModelScope.launch {
-                    studyRepository.recordResult(sessionId, currentWord.id, 1, responseTimeMs)
-                    saveProgress(newState)
-                    cardShownTimestamp = System.currentTimeMillis()
+                    viewModelScope.launch {
+                        studyRepository.recordResult(sessionId, currentWord.id, 1, responseTimeMs)
+                        cardShownTimestamp = System.currentTimeMillis()
+                    }
                 }
             }
             EvaluationResult.KNOWN -> {
@@ -324,6 +362,14 @@ class StudyViewModel @Inject constructor(
                     }
                 } else if (currentState.laterQueue.isNotEmpty()) {
                     // メインリスト完了だがlaterQueueに単語が残っている
+                    laterQueueCycleCount++
+                    if (laterQueueCycleCount > maxLaterQueueCycles) {
+                        viewModelScope.launch {
+                            studyRepository.recordResult(sessionId, currentWord.id, 2, responseTimeMs)
+                        }
+                        forceCompleteSession(sessionId)
+                        return
+                    }
                     val newState = currentState.copy(
                         words = currentState.laterQueue,
                         currentIndex = 0,
@@ -368,11 +414,13 @@ class StudyViewModel @Inject constructor(
 
     /**
      * Generate quiz options for the given word.
+     * Returns null if insufficient distractors (caller should fall back to flashcard).
      */
-    private fun generateQuizOptions(word: Word): QuizOptions {
+    private fun generateQuizOptions(word: Word, isReversed: Boolean = false): QuizOptions? {
         return QuizGenerator.generateOptions(
             correctWord = word,
-            allWordsInLevel = allWordsInLevel
+            allWordsInLevel = allWordsInLevel,
+            isReversed = isReversed
         )
     }
 
@@ -408,7 +456,7 @@ class StudyViewModel @Inject constructor(
             againCount++
         }
 
-        viewModelScope.launch {
+        lastRecordJob = viewModelScope.launch {
             studyRepository.recordResult(
                 currentState.sessionId,
                 currentWord.id,
@@ -416,6 +464,61 @@ class StudyViewModel @Inject constructor(
                 responseTimeMs
             )
             saveProgress(currentState)
+        }
+    }
+
+    /**
+     * Skip the current word in quiz mode (LATER equivalent).
+     */
+    fun quizSkipWord() {
+        val currentState = _uiState.value
+        if (currentState !is StudyUiState.Studying) return
+        if (currentState.isQuizAnswered) return
+
+        val currentWord = currentState.currentWord ?: return
+        laterCount++
+
+        val newLaterQueue = currentState.laterQueue + currentWord
+        val nextIndex = currentState.currentIndex + 1
+
+        val newState = if (nextIndex < currentState.words.size) {
+            val nextWord = currentState.words[nextIndex]
+            val quizOptions = generateQuizOptions(nextWord, currentState.isReversed)
+            currentState.copy(
+                currentIndex = nextIndex,
+                laterQueue = newLaterQueue,
+                quizOptions = quizOptions,
+                selectedAnswerIndex = null,
+                isQuizAnswered = false
+            )
+        } else if (newLaterQueue.isNotEmpty()) {
+            laterQueueCycleCount++
+            if (laterQueueCycleCount > maxLaterQueueCycles) {
+                viewModelScope.launch {
+                    studyRepository.recordResult(currentState.sessionId, currentWord.id, 1, 0L)
+                }
+                forceCompleteSession(currentState.sessionId)
+                return
+            }
+            val nextWord = newLaterQueue.first()
+            val quizOptions = generateQuizOptions(nextWord, currentState.isReversed)
+            currentState.copy(
+                words = newLaterQueue,
+                currentIndex = 0,
+                laterQueue = emptyList(),
+                quizOptions = quizOptions,
+                selectedAnswerIndex = null,
+                isQuizAnswered = false
+            )
+        } else {
+            return
+        }
+        _uiState.value = newState
+
+        viewModelScope.launch {
+            studyRepository.recordResult(currentState.sessionId, currentWord.id, 1, 0L)
+            saveProgress(newState)
+            cardShownTimestamp = System.currentTimeMillis()
         }
     }
 
@@ -431,13 +534,25 @@ class StudyViewModel @Inject constructor(
         val currentWord = currentState.currentWord ?: return
         val wasCorrect = currentState.selectedAnswerIndex == currentState.quizOptions?.correctIndex
 
+        // Ensure previous DB write completes before proceeding
+        viewModelScope.launch {
+            lastRecordJob?.join()
+            nextQuizWordInternal(currentState, currentWord, wasCorrect)
+        }
+    }
+
+    private suspend fun nextQuizWordInternal(
+        currentState: StudyUiState.Studying,
+        currentWord: Word,
+        wasCorrect: Boolean
+    ) {
         if (wasCorrect) {
             // Correct: advance to next word
             val nextIndex = currentState.currentIndex + 1
 
             if (nextIndex < currentState.words.size) {
                 val nextWord = currentState.words[nextIndex]
-                val quizOptions = generateQuizOptions(nextWord)
+                val quizOptions = generateQuizOptions(nextWord, currentState.isReversed)
 
                 val newState = currentState.copy(
                     currentIndex = nextIndex,
@@ -454,9 +569,14 @@ class StudyViewModel @Inject constructor(
                 }
             } else if (currentState.laterQueue.isNotEmpty()) {
                 // Main list done, start later queue
+                laterQueueCycleCount++
+                if (laterQueueCycleCount > maxLaterQueueCycles) {
+                    forceCompleteSession(currentState.sessionId)
+                    return
+                }
                 val newWords = currentState.laterQueue
                 val nextWord = newWords.first()
-                val quizOptions = generateQuizOptions(nextWord)
+                val quizOptions = generateQuizOptions(nextWord, currentState.isReversed)
 
                 val newState = currentState.copy(
                     words = newWords,
@@ -505,7 +625,7 @@ class StudyViewModel @Inject constructor(
 
             if (nextIndex < currentState.words.size) {
                 val nextWord = currentState.words[nextIndex]
-                val quizOptions = generateQuizOptions(nextWord)
+                val quizOptions = generateQuizOptions(nextWord, currentState.isReversed)
 
                 val newState = currentState.copy(
                     currentIndex = nextIndex,
@@ -523,8 +643,13 @@ class StudyViewModel @Inject constructor(
                 }
             } else if (newLaterQueue.isNotEmpty()) {
                 // Main list done, start later queue
+                laterQueueCycleCount++
+                if (laterQueueCycleCount > maxLaterQueueCycles) {
+                    forceCompleteSession(currentState.sessionId)
+                    return
+                }
                 val nextWord = newLaterQueue.first()
-                val quizOptions = generateQuizOptions(nextWord)
+                val quizOptions = generateQuizOptions(nextWord, currentState.isReversed)
 
                 val newState = currentState.copy(
                     words = newLaterQueue,
@@ -548,6 +673,30 @@ class StudyViewModel @Inject constructor(
                     selectedAnswerIndex = null,
                     isQuizAnswered = false
                 )
+            }
+        }
+    }
+
+    /**
+     * Force complete the session when laterQueue cycle limit is exceeded.
+     */
+    private fun forceCompleteSession(sessionId: Long) {
+        _uiState.value = StudyUiState.Completed(
+            sessionId = sessionId,
+            levelId = currentLevelId,
+            totalCount = knownCount + againCount + laterCount,
+            knownCount = knownCount,
+            againCount = againCount,
+            laterCount = laterCount,
+            streak = 0
+        )
+
+        viewModelScope.launch {
+            studyRepository.completeSession(sessionId, knownCount + againCount, knownCount)
+            val streak = studyRepository.getCurrentStreak()
+            val completedState = _uiState.value
+            if (completedState is StudyUiState.Completed) {
+                _uiState.value = completedState.copy(streak = streak)
             }
         }
     }
@@ -587,6 +736,11 @@ class StudyViewModel @Inject constructor(
                 laterQueue = newLaterQueue
             )
         } else if (newLaterQueue.isNotEmpty()) {
+            laterQueueCycleCount++
+            if (laterQueueCycleCount > maxLaterQueueCycles) {
+                forceCompleteSession(currentState.sessionId)
+                return
+            }
             currentState.copy(
                 words = newLaterQueue,
                 currentIndex = 0,

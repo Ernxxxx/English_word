@@ -12,9 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 /**
@@ -85,7 +84,7 @@ class StatsViewModel @Inject constructor(
         )
     }
 
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
     private val _uiState = MutableStateFlow(StatsUiState())
     val uiState: StateFlow<StatsUiState> = _uiState.asStateFlow()
@@ -184,17 +183,12 @@ class StatsViewModel @Inject constructor(
      * ordered from oldest to newest.
      */
     private fun generateDateRange(days: Int): List<String> {
-        val calendar = Calendar.getInstance()
-        val dates = mutableListOf<String>()
+        val today = LocalDate.now()
+        val startDate = today.minusDays((days - 1).toLong())
 
-        // Start from (days - 1) days ago, up to today
-        calendar.add(Calendar.DAY_OF_YEAR, -(days - 1))
-        repeat(days) {
-            dates.add(dateFormat.format(calendar.time))
-            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        return (0 until days).map { offset ->
+            startDate.plusDays(offset.toLong()).format(dateFormatter)
         }
-
-        return dates
     }
 
     /**
