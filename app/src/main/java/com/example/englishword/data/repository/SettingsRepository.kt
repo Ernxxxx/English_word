@@ -54,6 +54,11 @@ class SettingsRepository @Inject constructor(
         const val KEY_AUTO_PLAY_AUDIO = "auto_play_audio"
         const val KEY_SHOW_EXAMPLES = "show_examples"
         const val KEY_STUDY_DIRECTION_REVERSED = "study_direction_reversed" // true = 日→英
+        const val KEY_STUDY_MODE = "study_mode"
+
+        // Study Mode Values
+        const val STUDY_MODE_FLASHCARD = "flashcard"
+        const val STUDY_MODE_QUIZ = "quiz"
 
         // Default Values
         const val DEFAULT_DAILY_GOAL = 20
@@ -625,6 +630,51 @@ class SettingsRepository @Inject constructor(
      */
     suspend fun setStudyDirectionReversed(reversed: Boolean): Boolean {
         return setBooleanValue(KEY_STUDY_DIRECTION_REVERSED, reversed)
+    }
+
+    // ==================== Study Mode ====================
+
+    /**
+     * Get study mode (flashcard or quiz).
+     */
+    fun getStudyMode(): Flow<String> {
+        return userSettingsDao.getValueFlow(KEY_STUDY_MODE)
+            .map { it ?: STUDY_MODE_FLASHCARD }
+            .catch { e ->
+                emit(STUDY_MODE_FLASHCARD)
+            }
+    }
+
+    /**
+     * Get study mode synchronously.
+     */
+    suspend fun getStudyModeSync(): String {
+        return try {
+            userSettingsDao.getValue(KEY_STUDY_MODE) ?: STUDY_MODE_FLASHCARD
+        } catch (e: Exception) {
+            STUDY_MODE_FLASHCARD
+        }
+    }
+
+    /**
+     * Set study mode.
+     */
+    suspend fun setStudyMode(mode: String): Boolean {
+        return setStringValue(KEY_STUDY_MODE, mode)
+    }
+
+    /**
+     * Check if study mode is quiz mode.
+     */
+    fun isQuizMode(): Flow<Boolean> {
+        return getStudyMode().map { it == STUDY_MODE_QUIZ }
+    }
+
+    /**
+     * Check if study mode is quiz mode synchronously.
+     */
+    suspend fun isQuizModeSync(): Boolean {
+        return getStudyModeSync() == STUDY_MODE_QUIZ
     }
 
     // ==================== Reset Operations ====================

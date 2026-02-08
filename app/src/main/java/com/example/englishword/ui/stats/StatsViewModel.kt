@@ -1,0 +1,207 @@
+package com.example.englishword.ui.stats
+
+import android.util.Log
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.englishword.data.repository.StudyRepository
+import com.example.englishword.data.repository.WordRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import javax.inject.Inject
+
+/**
+ * Data class representing a single day's study count for charts and heatmaps.
+ *
+ * @param date The date string in "yyyy-MM-dd" format
+ * @param count Number of words studied on that day
+ */
+data class DailyStudyData(
+    val date: String,
+    val count: Int
+)
+
+/**
+ * Data class representing the word count at a specific mastery level.
+ *
+ * @param level The mastery level (0-5)
+ * @param count Number of words at this level
+ * @param label Human-readable label for the level
+ */
+data class MasteryLevel(
+    val level: Int,
+    val count: Int,
+    val label: String
+)
+
+/**
+ * UI state for the Statistics screen.
+ */
+data class StatsUiState(
+    val weeklyData: List<DailyStudyData> = emptyList(),
+    val monthlyData: List<DailyStudyData> = emptyList(),
+    val currentStreak: Int = 0,
+    val maxStreak: Int = 0,
+    val totalWordsStudied: Int = 0,
+    val totalWordsMastered: Int = 0,
+    val totalWords: Int = 0,
+    val averageDaily: Float = 0f,
+    val masteryDistribution: List<MasteryLevel> = emptyList(),
+    val isLoading: Boolean = true
+)
+
+/**
+ * ViewModel for the Statistics screen.
+ * Aggregates data from UserStats, Words, and StudySessions to present
+ * comprehensive learning statistics including streaks, weekly/monthly
+ * charts, mastery distribution, and overall progress.
+ */
+@HiltViewModel
+class StatsViewModel @Inject constructor(
+    private val studyRepository: StudyRepository,
+    private val wordRepository: WordRepository
+) : ViewModel() {
+
+    companion object {
+        private const val TAG = "StatsViewModel"
+        private const val WEEKLY_DAYS = 7
+        private const val MONTHLY_DAYS = 30
+
+        /** Human-readable labels for mastery levels 0-5. */
+        private val MASTERY_LABELS = listOf(
+            "New",       // 0: Not yet studied
+            "Level 1",   // 1: First exposure
+            "Level 2",   // 2: Learning
+            "Level 3",   // 3: Familiar
+            "Level 4",   // 4: Almost mastered
+            "Mastered"   // 5: Fully mastered
+        )
+    }
+
+    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+    private val _uiState = MutableStateFlow(StatsUiState())
+    val uiState: StateFlow<StatsUiState> = _uiState.asStateFlow()
+
+    init {
+        loadStats()
+    }
+
+    /**
+     * Load all statistics data.
+     * Combines reactive Flow sources (total word count, mastered count, total studied,
+     * average daily) with one-shot suspend calls (streaks, mastery distribution, recent stats).
+     */
+    private fun loadStats() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
+            try {
+                // Load one-shot data in parallel via suspend calls
+                val currentStreak = studyRepository.getCurrentStreak()
+                val maxStreak = studyRepository.getMaxStreak()
+                val masteryDistribution = buildMasteryDistribution()
+
+                // Generate date-based lists for the last 7 and 30 days
+                val weeklyDates = generateDateRange(WEEKLY_DAYS)
+                val monthlyDates = generateDateRange(MONTHLY_DAYS)
+
+                // Combine reactive Flow sources for continuous updates
+                combine(
+                    wordRepository.getTotalWordCount(),
+                    wordRepository.getTotalMasteredCount(),
+                    studyRepository.getTotalWordsStudied(),
+                    studyRepository.getAverageStudiedCount(),
+                    studyRepository.getRecentStats(MONTHLY_DAYS)
+                ) { totalWords, totalMastered, totalStudied, averageDaily, recentStats ->
+                    // Build a lookup map from date -> studiedCount
+                    val statsMap = recentStats.associate { it.date to it.studiedCount }
+
+                    // Fill in weekly data (most recent 7 days)
+                    val weeklyData = weeklyDates.map { date ->
+                        DailyStudyData(
+                            date = date,
+                            count = statsMap[date] ?: 0
+                        )
+                    }
+
+                    // Fill in monthly data (most recent 30 days, for heatmap)
+                    val monthlyData = monthlyDates.map { date ->
+                        DailyStudyData(
+                            date = date,
+                            count = statsMap[date] ?: 0
+                        )
+                    }
+
+                    StatsUiState(
+                        weeklyData = weeklyData,
+                        monthlyData = monthlyData,
+                        currentStreak = currentStreak,
+                        maxStreak = maxStreak,
+                        totalWordsStudied = totalStudied,
+                        totalWordsMastered = totalMastered,
+                        totalWords = totalWords,
+                        averageDaily = averageDaily,
+                        masteryDistribution = masteryDistribution,
+                        isLoading = false
+                    )
+                }.collect { state ->
+                    _uiState.value = state
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "loadStats failed", e)
+                _uiState.update { it.copy(isLoading = false) }
+            }
+        }
+    }
+
+    /**
+     * Build the full mastery distribution list (levels 0-5).
+     * Ensures all 6 levels are represented even if some have zero words.
+     */
+    private suspend fun buildMasteryDistribution(): List<MasteryLevel> {
+        val rawDistribution = wordRepository.getMasteryDistribution()
+        val countMap = rawDistribution.associate { it.masteryLevel to it.count }
+
+        return (0..5).map { level ->
+            MasteryLevel(
+                level = level,
+                count = countMap[level] ?: 0,
+                label = MASTERY_LABELS.getOrElse(level) { "Level $level" }
+            )
+        }
+    }
+
+    /**
+     * Generate a list of date strings for the last [days] days (inclusive of today),
+     * ordered from oldest to newest.
+     */
+    private fun generateDateRange(days: Int): List<String> {
+        val calendar = Calendar.getInstance()
+        val dates = mutableListOf<String>()
+
+        // Start from (days - 1) days ago, up to today
+        calendar.add(Calendar.DAY_OF_YEAR, -(days - 1))
+        repeat(days) {
+            dates.add(dateFormat.format(calendar.time))
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        }
+
+        return dates
+    }
+
+    /**
+     * Refresh all statistics data.
+     * Can be called from the UI to trigger a full reload.
+     */
+    fun refresh() {
+        loadStats()
+    }
+}

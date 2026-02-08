@@ -9,6 +9,9 @@ import com.example.englishword.data.repository.SettingsRepository
 import com.example.englishword.data.repository.StudyRepository
 import com.example.englishword.data.repository.UnlockRepository
 import com.example.englishword.data.repository.WordRepository
+import com.example.englishword.ui.quiz.QuizGenerator
+import com.example.englishword.ui.quiz.QuizOptions
+import com.example.englishword.util.TtsManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +21,7 @@ import javax.inject.Inject
 
 /**
  * ViewModel for the Study screen.
- * Manages the study session, card flipping, and word evaluation.
+ * Manages the study session, card flipping, word evaluation, and quiz mode.
  */
 @HiltViewModel
 class StudyViewModel @Inject constructor(
@@ -26,7 +29,8 @@ class StudyViewModel @Inject constructor(
     private val studyRepository: StudyRepository,
     private val settingsRepository: SettingsRepository, // Added: for premium check
     private val unlockRepository: UnlockRepository, // Added: for review limits
-    val adManager: AdManager // Added: for interstitial ads
+    val adManager: AdManager, // Added: for interstitial ads
+    val ttsManager: TtsManager // Added: for TTS pronunciation
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<StudyUiState>(StudyUiState.Loading)
@@ -41,6 +45,10 @@ class StudyViewModel @Inject constructor(
     // Track when card was shown to user (for response time measurement)
     private var cardShownTimestamp: Long = 0L
 
+    // Quiz mode: cached words in current level for generating distractors
+    private var allWordsInLevel: List<Word> = emptyList()
+    private var isQuizMode: Boolean = false
+
     /**
      * Load words for study from the specified level.
      * First checks for an incomplete session to resume.
@@ -51,6 +59,30 @@ class StudyViewModel @Inject constructor(
             _uiState.value = StudyUiState.Loading
 
             try {
+                // Check study mode setting
+                isQuizMode = settingsRepository.isQuizModeSync()
+
+                // Check if free user has exceeded daily review limit
+                val isPremium = settingsRepository.isPremiumSync()
+                if (!isPremium) {
+                    val canReview = unlockRepository.canReviewMore(isPremium)
+                    if (!canReview) {
+                        _uiState.value = StudyUiState.Error("Daily review limit reached. Upgrade to premium for unlimited reviews.")
+                        return@launch
+                    }
+
+                    val isUnlocked = unlockRepository.isUnitUnlocked(levelId, isPremium = false, isParentLevel = false)
+                    if (!isUnlocked) {
+                        _uiState.value = StudyUiState.Error("This unit is locked. Watch an ad or upgrade to premium.")
+                        return@launch
+                    }
+                }
+
+                // For quiz mode, pre-load all words in the level for distractor generation
+                if (isQuizMode) {
+                    allWordsInLevel = wordRepository.getWordsByLevelSync(levelId)
+                }
+
                 // Check for incomplete session to resume
                 val incompleteSession = studyRepository.getIncompleteSessionForLevel(levelId)
 
@@ -98,13 +130,25 @@ class StudyViewModel @Inject constructor(
         // Start response time tracking for resumed session
         cardShownTimestamp = System.currentTimeMillis()
 
+        val currentIndex = session.currentIndex.coerceAtMost(words.size - 1)
+        val currentWord = words.getOrNull(currentIndex)
+
+        // Generate quiz options if in quiz mode
+        val quizOptions = if (isQuizMode && currentWord != null) {
+            generateQuizOptions(currentWord)
+        } else null
+
         _uiState.value = StudyUiState.Studying(
             words = words,
-            currentIndex = session.currentIndex.coerceAtMost(words.size - 1),
+            currentIndex = currentIndex,
             isFlipped = false,
             sessionId = session.id,
             laterQueue = laterQueue,
-            isReversed = session.isReversed
+            isReversed = session.isReversed,
+            isQuizMode = isQuizMode,
+            quizOptions = quizOptions,
+            selectedAnswerIndex = null,
+            isQuizAnswered = false
         )
     }
 
@@ -139,13 +183,23 @@ class StudyViewModel @Inject constructor(
         // Start response time tracking
         cardShownTimestamp = System.currentTimeMillis()
 
+        // Generate quiz options if in quiz mode
+        val firstWord = words.firstOrNull()
+        val quizOptions = if (isQuizMode && firstWord != null) {
+            generateQuizOptions(firstWord)
+        } else null
+
         _uiState.value = StudyUiState.Studying(
             words = words,
             currentIndex = 0,
             isFlipped = false,
             sessionId = sessionId,
             laterQueue = emptyList(),
-            isReversed = isReversed
+            isReversed = isReversed,
+            isQuizMode = isQuizMode,
+            quizOptions = quizOptions,
+            selectedAnswerIndex = null,
+            isQuizAnswered = false
         )
     }
 
@@ -173,6 +227,18 @@ class StudyViewModel @Inject constructor(
                 isReversed = !currentState.isReversed,
                 isFlipped = false
             )
+        }
+    }
+
+    /**
+     * Speak the current word's English text via TTS.
+     */
+    fun speakWord() {
+        val currentState = _uiState.value
+        if (currentState is StudyUiState.Studying) {
+            currentState.currentWord?.let { word ->
+                ttsManager.speak(word.english)
+            }
         }
     }
 
@@ -276,10 +342,10 @@ class StudyViewModel @Inject constructor(
                     _uiState.value = StudyUiState.Completed(
                         sessionId = sessionId,
                         levelId = currentLevelId,
-                        totalCount = knownCount + againCount,
+                        totalCount = knownCount + againCount + laterCount,
                         knownCount = knownCount,
                         againCount = againCount,
-                        laterCount = 0,
+                        laterCount = laterCount,
                         streak = 0
                     )
 
@@ -294,6 +360,194 @@ class StudyViewModel @Inject constructor(
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // ==================== Quiz Mode Methods ====================
+
+    /**
+     * Generate quiz options for the given word.
+     */
+    private fun generateQuizOptions(word: Word): QuizOptions {
+        return QuizGenerator.generateOptions(
+            correctWord = word,
+            allWordsInLevel = allWordsInLevel
+        )
+    }
+
+    /**
+     * Handle quiz answer selection.
+     * Correct answer = KNOWN (result=2), Wrong answer = AGAIN (result=0).
+     */
+    fun selectQuizAnswer(index: Int) {
+        val currentState = _uiState.value
+        if (currentState !is StudyUiState.Studying) return
+        if (currentState.isQuizAnswered) return // Already answered
+        if (currentState.quizOptions == null) return
+
+        val currentWord = currentState.currentWord ?: return
+        val isCorrect = index == currentState.quizOptions.correctIndex
+        val responseTimeMs = System.currentTimeMillis() - cardShownTimestamp
+
+        // Update UI state to show result
+        _uiState.value = currentState.copy(
+            selectedAnswerIndex = index,
+            isQuizAnswered = true
+        )
+
+        // Record the result
+        val resultValue = if (isCorrect) 2 else 0 // KNOWN=2, AGAIN=0
+        if (isCorrect) {
+            knownCount++
+            // Increment review count for free users
+            viewModelScope.launch {
+                unlockRepository.incrementReviewCount()
+            }
+        } else {
+            againCount++
+        }
+
+        viewModelScope.launch {
+            studyRepository.recordResult(
+                currentState.sessionId,
+                currentWord.id,
+                resultValue,
+                responseTimeMs
+            )
+            saveProgress(currentState)
+        }
+    }
+
+    /**
+     * Move to the next word in quiz mode.
+     * Called when user presses "Next" after answering.
+     */
+    fun nextQuizWord() {
+        val currentState = _uiState.value
+        if (currentState !is StudyUiState.Studying) return
+        if (!currentState.isQuizAnswered) return
+
+        val currentWord = currentState.currentWord ?: return
+        val wasCorrect = currentState.selectedAnswerIndex == currentState.quizOptions?.correctIndex
+
+        if (wasCorrect) {
+            // Correct: advance to next word
+            val nextIndex = currentState.currentIndex + 1
+
+            if (nextIndex < currentState.words.size) {
+                val nextWord = currentState.words[nextIndex]
+                val quizOptions = generateQuizOptions(nextWord)
+
+                val newState = currentState.copy(
+                    currentIndex = nextIndex,
+                    isFlipped = false,
+                    quizOptions = quizOptions,
+                    selectedAnswerIndex = null,
+                    isQuizAnswered = false
+                )
+                _uiState.value = newState
+
+                viewModelScope.launch {
+                    saveProgress(newState)
+                    cardShownTimestamp = System.currentTimeMillis()
+                }
+            } else if (currentState.laterQueue.isNotEmpty()) {
+                // Main list done, start later queue
+                val newWords = currentState.laterQueue
+                val nextWord = newWords.first()
+                val quizOptions = generateQuizOptions(nextWord)
+
+                val newState = currentState.copy(
+                    words = newWords,
+                    currentIndex = 0,
+                    isFlipped = false,
+                    laterQueue = emptyList(),
+                    quizOptions = quizOptions,
+                    selectedAnswerIndex = null,
+                    isQuizAnswered = false
+                )
+                _uiState.value = newState
+
+                viewModelScope.launch {
+                    saveProgress(newState)
+                    cardShownTimestamp = System.currentTimeMillis()
+                }
+            } else {
+                // All words completed
+                _uiState.value = StudyUiState.Completed(
+                    sessionId = currentState.sessionId,
+                    levelId = currentLevelId,
+                    totalCount = knownCount + againCount + laterCount,
+                    knownCount = knownCount,
+                    againCount = againCount,
+                    laterCount = laterCount,
+                    streak = 0
+                )
+
+                viewModelScope.launch {
+                    studyRepository.completeSession(
+                        currentState.sessionId,
+                        knownCount + againCount,
+                        knownCount
+                    )
+                    val streak = studyRepository.getCurrentStreak()
+                    val completedState = _uiState.value
+                    if (completedState is StudyUiState.Completed) {
+                        _uiState.value = completedState.copy(streak = streak)
+                    }
+                }
+            }
+        } else {
+            // Wrong: add to later queue and advance
+            val newLaterQueue = currentState.laterQueue + currentWord
+            val nextIndex = currentState.currentIndex + 1
+
+            if (nextIndex < currentState.words.size) {
+                val nextWord = currentState.words[nextIndex]
+                val quizOptions = generateQuizOptions(nextWord)
+
+                val newState = currentState.copy(
+                    currentIndex = nextIndex,
+                    isFlipped = false,
+                    laterQueue = newLaterQueue,
+                    quizOptions = quizOptions,
+                    selectedAnswerIndex = null,
+                    isQuizAnswered = false
+                )
+                _uiState.value = newState
+
+                viewModelScope.launch {
+                    saveProgress(newState)
+                    cardShownTimestamp = System.currentTimeMillis()
+                }
+            } else if (newLaterQueue.isNotEmpty()) {
+                // Main list done, start later queue
+                val nextWord = newLaterQueue.first()
+                val quizOptions = generateQuizOptions(nextWord)
+
+                val newState = currentState.copy(
+                    words = newLaterQueue,
+                    currentIndex = 0,
+                    isFlipped = false,
+                    laterQueue = emptyList(),
+                    quizOptions = quizOptions,
+                    selectedAnswerIndex = null,
+                    isQuizAnswered = false
+                )
+                _uiState.value = newState
+
+                viewModelScope.launch {
+                    saveProgress(newState)
+                    cardShownTimestamp = System.currentTimeMillis()
+                }
+            } else {
+                // Should not happen (we just added to laterQueue)
+                _uiState.value = currentState.copy(
+                    isFlipped = false,
+                    selectedAnswerIndex = null,
+                    isQuizAnswered = false
+                )
             }
         }
     }

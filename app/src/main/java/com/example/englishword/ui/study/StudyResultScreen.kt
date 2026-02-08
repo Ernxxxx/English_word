@@ -41,7 +41,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,8 +79,8 @@ fun StudyResultScreen(
     modifier: Modifier = Modifier,
     viewModel: StudyViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val isPremium by viewModel.adManager.isPremium.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isPremium by viewModel.adManager.isPremium.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context as? Activity
 

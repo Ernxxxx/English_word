@@ -1,6 +1,7 @@
 package com.example.englishword.ui.study
 
 import com.example.englishword.data.local.entity.Word
+import com.example.englishword.ui.quiz.QuizOptions
 
 /**
  * Sealed class representing the UI state of the Study screen.
@@ -21,7 +22,12 @@ sealed class StudyUiState {
         val isFlipped: Boolean,
         val sessionId: Long,
         val laterQueue: List<Word> = emptyList(),
-        val isReversed: Boolean = false // true = 日本語→英語
+        val isReversed: Boolean = false, // true = 日本語→英語
+        // Quiz mode fields
+        val isQuizMode: Boolean = false,
+        val quizOptions: QuizOptions? = null,
+        val selectedAnswerIndex: Int? = null,
+        val isQuizAnswered: Boolean = false
     ) : StudyUiState() {
         val currentWord: Word?
             get() = words.getOrNull(currentIndex)

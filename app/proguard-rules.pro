@@ -25,9 +25,7 @@
 -keep @androidx.room.Entity class *
 -dontwarn androidx.room.paging.**
 
-# Hilt
--keep class dagger.hilt.** { *; }
--keep class javax.inject.** { *; }
+# Hilt (ships its own ProGuard rules; only keep HiltViewModel subclasses)
 -keep class * extends dagger.hilt.android.lifecycle.HiltViewModel
 
 # Coroutines
@@ -50,10 +48,6 @@
 -keep,allowobfuscation,allowshrinking class kotlinx.coroutines.flow.StateFlow
 -keep,allowobfuscation,allowshrinking class kotlinx.coroutines.flow.SharedFlow
 
-# Compose
--dontwarn androidx.compose.**
--keep class androidx.compose.** { *; }
-
 # Keep data classes
 -keep class com.example.englishword.data.local.entity.** { *; }
 -keep class com.example.englishword.domain.model.** { *; }
@@ -64,3 +58,6 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
+
+# Firebase Crashlytics (prepared for future integration)
+-renamesourcefileattribute SourceFile

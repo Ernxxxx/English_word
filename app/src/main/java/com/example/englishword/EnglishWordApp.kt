@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.example.englishword.ads.AdManager
-import com.example.englishword.ads.InterstitialAdManager
 import com.example.englishword.data.local.InitialDataSeeder
 import com.example.englishword.data.repository.SettingsRepository
 import com.example.englishword.notification.NotificationScheduler
@@ -30,9 +29,6 @@ class EnglishWordApp : Application(), Configuration.Provider {
     lateinit var adManager: AdManager
 
     @Inject
-    lateinit var interstitialAdManager: InterstitialAdManager
-
-    @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
     @Inject
@@ -51,16 +47,15 @@ class EnglishWordApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
 
-        // Initialize AdMob SDK
-        adManager.initialize()
+        // Initialize AdMob SDK on background thread
+        applicationScope.launch(Dispatchers.IO) {
+            adManager.initialize()
+        }
 
         // Seed initial data if the database is empty
         applicationScope.launch {
             initialDataSeeder.seedIfNeeded()
         }
-
-        // Pre-load interstitial ad
-        interstitialAdManager.loadAd()
 
         // Initialize notifications based on saved settings
         applicationScope.launch {

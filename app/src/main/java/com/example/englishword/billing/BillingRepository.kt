@@ -3,6 +3,7 @@ package com.example.englishword.billing
 import android.app.Activity
 import android.util.Log
 import com.android.billingclient.api.BillingClient
+import com.example.englishword.BuildConfig
 import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.example.englishword.di.ApplicationScope
@@ -121,18 +122,18 @@ class BillingRepository @Inject constructor(
      * Query available products (subscriptions).
      */
     suspend fun queryProducts(): Result<List<ProductDetails>> {
-        Log.d(TAG, "Querying products...")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Querying products...")
         _purchaseState.value = PurchaseState.Loading
 
         val result = billingClientWrapper.querySubscriptionProductDetails()
 
         result.fold(
             onSuccess = { products ->
-                Log.d(TAG, "Products loaded: ${products.size}")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Products loaded: ${products.size}")
                 _purchaseState.value = PurchaseState.Idle
             },
             onFailure = { error ->
-                Log.e(TAG, "Failed to load products", error)
+                if (BuildConfig.DEBUG) Log.e(TAG, "Failed to load products", error)
                 _purchaseState.value = PurchaseState.Error(
                     error.message ?: "Unknown error",
                     (error as? BillingException)?.responseCode ?: BillingClient.BillingResponseCode.ERROR
@@ -164,7 +165,7 @@ class BillingRepository @Inject constructor(
      * Launch the purchase flow for premium subscription.
      */
     suspend fun launchPurchaseFlow(activity: Activity): Result<Unit> {
-        Log.d(TAG, "Launching purchase flow...")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Launching purchase flow...")
         _purchaseState.value = PurchaseState.Loading
 
         val result = billingClientWrapper.launchPurchaseFlow(
@@ -176,12 +177,12 @@ class BillingRepository @Inject constructor(
             onSuccess = { billingResult ->
                 when (billingResult.responseCode) {
                     BillingClient.BillingResponseCode.OK -> {
-                        Log.d(TAG, "Billing flow launched successfully")
+                        if (BuildConfig.DEBUG) Log.d(TAG, "Billing flow launched successfully")
                         Result.success(Unit)
                     }
                     else -> {
                         val message = "Failed to launch purchase: ${billingResult.debugMessage}"
-                        Log.e(TAG, message)
+                        if (BuildConfig.DEBUG) Log.e(TAG, message)
                         _purchaseState.value = PurchaseState.Error(
                             message,
                             billingResult.responseCode
@@ -192,7 +193,7 @@ class BillingRepository @Inject constructor(
                 }
             },
             onFailure = { error ->
-                Log.e(TAG, "Failed to launch purchase flow", error)
+                if (BuildConfig.DEBUG) Log.e(TAG, "Failed to launch purchase flow", error)
                 _purchaseState.value = PurchaseState.Error(
                     error.message ?: "Unknown error",
                     (error as? BillingException)?.responseCode ?: BillingClient.BillingResponseCode.ERROR
@@ -207,14 +208,14 @@ class BillingRepository @Inject constructor(
      * Query existing purchases (for restore functionality).
      */
     suspend fun queryPurchases(): Result<List<Purchase>> {
-        Log.d(TAG, "Querying purchases...")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Querying purchases...")
         _purchaseState.value = PurchaseState.Loading
 
         val result = billingClientWrapper.querySubscriptionPurchases()
 
         result.fold(
             onSuccess = { purchaseList ->
-                Log.d(TAG, "Purchases loaded: ${purchaseList.size}")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Purchases loaded: ${purchaseList.size}")
                 _purchaseState.value = PurchaseState.Idle
 
                 // Update premium status
@@ -229,7 +230,7 @@ class BillingRepository @Inject constructor(
                 }
             },
             onFailure = { error ->
-                Log.e(TAG, "Failed to load purchases", error)
+                if (BuildConfig.DEBUG) Log.e(TAG, "Failed to load purchases", error)
                 _purchaseState.value = PurchaseState.Error(
                     error.message ?: "Unknown error",
                     (error as? BillingException)?.responseCode ?: BillingClient.BillingResponseCode.ERROR
@@ -245,16 +246,16 @@ class BillingRepository @Inject constructor(
      * Acknowledge a purchase.
      */
     suspend fun acknowledgePurchase(purchase: Purchase): Result<Unit> {
-        Log.d(TAG, "Acknowledging purchase: ${purchase.orderId}")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Acknowledging purchase: ${purchase.orderId}")
 
         val result = billingClientWrapper.acknowledgePurchase(purchase)
 
         result.fold(
             onSuccess = {
-                Log.d(TAG, "Purchase acknowledged successfully")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Purchase acknowledged successfully")
             },
             onFailure = { error ->
-                Log.e(TAG, "Failed to acknowledge purchase", error)
+                if (BuildConfig.DEBUG) Log.e(TAG, "Failed to acknowledge purchase", error)
                 _errorMessage.emit("Failed to acknowledge purchase: ${error.message}")
             }
         )
@@ -285,7 +286,7 @@ class BillingRepository @Inject constructor(
     private fun handlePurchaseEvent(event: BillingClientWrapper.PurchaseEvent) {
         when (event) {
             is BillingClientWrapper.PurchaseEvent.PurchaseCompleted -> {
-                Log.d(TAG, "Purchase completed: ${event.purchase.orderId}")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Purchase completed: ${event.purchase.orderId}")
                 _purchaseState.value = PurchaseState.Success(event.purchase)
                 _isPremium.value = true
 
@@ -295,15 +296,15 @@ class BillingRepository @Inject constructor(
                 }
             }
             is BillingClientWrapper.PurchaseEvent.PurchasePending -> {
-                Log.d(TAG, "Purchase pending: ${event.purchase.orderId}")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Purchase pending: ${event.purchase.orderId}")
                 _purchaseState.value = PurchaseState.Pending
             }
             is BillingClientWrapper.PurchaseEvent.PurchaseCancelled -> {
-                Log.d(TAG, "Purchase cancelled")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Purchase cancelled")
                 _purchaseState.value = PurchaseState.Cancelled
             }
             is BillingClientWrapper.PurchaseEvent.PurchaseError -> {
-                Log.e(TAG, "Purchase error: ${event.message}")
+                if (BuildConfig.DEBUG) Log.e(TAG, "Purchase error: ${event.message}")
                 _purchaseState.value = PurchaseState.Error(event.message, event.responseCode)
                 applicationScope.launch {
                     _errorMessage.emit(event.message)
@@ -321,7 +322,7 @@ class BillingRepository @Inject constructor(
     }
 
     private suspend fun refreshProductsAndPurchases() {
-        Log.d(TAG, "Refreshing products and purchases...")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Refreshing products and purchases...")
         queryProducts()
         queryPurchases()
     }

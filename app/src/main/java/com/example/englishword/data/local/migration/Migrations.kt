@@ -143,6 +143,62 @@ object Migrations {
     }
 
     /**
+     * Migration from version 5 to 6.
+     * Adds composite index on (levelId, nextReviewAt) for optimized review queries.
+     */
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_words_levelId_nextReviewAt` ON `words` (`levelId`, `nextReviewAt`)")
+        }
+    }
+
+    /**
+     * Migration from version 4 to 6 (skip version 5).
+     */
+    val MIGRATION_4_6 = object : Migration(4, 6) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_4_5.migrate(database)
+            MIGRATION_5_6.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 3 to 6 (skip versions 4, 5).
+     */
+    val MIGRATION_3_6 = object : Migration(3, 6) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_3_4.migrate(database)
+            MIGRATION_4_5.migrate(database)
+            MIGRATION_5_6.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 2 to 6 (skip versions 3, 4, 5).
+     */
+    val MIGRATION_2_6 = object : Migration(2, 6) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_2_3.migrate(database)
+            MIGRATION_3_4.migrate(database)
+            MIGRATION_4_5.migrate(database)
+            MIGRATION_5_6.migrate(database)
+        }
+    }
+
+    /**
+     * Migration from version 1 to 6 (skip versions 2, 3, 4, 5).
+     */
+    val MIGRATION_1_6 = object : Migration(1, 6) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            MIGRATION_1_2.migrate(database)
+            MIGRATION_2_3.migrate(database)
+            MIGRATION_3_4.migrate(database)
+            MIGRATION_4_5.migrate(database)
+            MIGRATION_5_6.migrate(database)
+        }
+    }
+
+    /**
      * Get all migrations for the database builder.
      */
     fun getAllMigrations(): Array<Migration> {
@@ -156,7 +212,12 @@ object Migrations {
             MIGRATION_4_5,
             MIGRATION_3_5,
             MIGRATION_2_5,
-            MIGRATION_1_5
+            MIGRATION_1_5,
+            MIGRATION_5_6,
+            MIGRATION_4_6,
+            MIGRATION_3_6,
+            MIGRATION_2_6,
+            MIGRATION_1_6
         )
     }
 }

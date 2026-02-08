@@ -85,7 +85,7 @@ object OnboardingPages {
             title = "毎日続けよう",
             description = "連続学習日数(ストリーク)を\n積み重ねてモチベーションアップ\n毎日の習慣で確実に身につきます",
             primaryColor = StreakOrange,
-            secondaryColor = Color(0xFFFFE0B2)
+            secondaryColor = StreakOrange.copy(alpha = 0.3f)
         )
     )
 }
@@ -170,7 +170,7 @@ fun OnboardingPage(
                         imageVector = pageData.icon,
                         contentDescription = null,
                         modifier = Modifier.size(56.dp),
-                        tint = Color.White
+                        tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
             }

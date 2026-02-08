@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import com.android.billingclient.api.*
+import com.example.englishword.BuildConfig
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -84,7 +85,7 @@ class BillingClientWrapper(
     fun startConnection() {
         if (_connectionState.value == ConnectionState.Connected ||
             _connectionState.value == ConnectionState.Connecting) {
-            Log.d(TAG, "Already connected or connecting")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Already connected or connecting")
             return
         }
 
@@ -104,12 +105,12 @@ class BillingClientWrapper(
     override fun onBillingSetupFinished(billingResult: BillingResult) {
         when (billingResult.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
-                Log.d(TAG, "Billing setup finished successfully")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Billing setup finished successfully")
                 _connectionState.value = ConnectionState.Connected
                 reconnectAttempts = 0
             }
             else -> {
-                Log.e(TAG, "Billing setup failed: ${billingResult.debugMessage}")
+                if (BuildConfig.DEBUG) Log.e(TAG, "Billing setup failed: ${billingResult.debugMessage}")
                 _connectionState.value = ConnectionState.Error(
                     "Setup failed: ${billingResult.debugMessage}"
                 )
@@ -118,16 +119,16 @@ class BillingClientWrapper(
     }
 
     override fun onBillingServiceDisconnected() {
-        Log.w(TAG, "Billing service disconnected")
+        if (BuildConfig.DEBUG) Log.w(TAG, "Billing service disconnected")
         _connectionState.value = ConnectionState.Disconnected
 
         // Attempt to reconnect
         if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             reconnectAttempts++
-            Log.d(TAG, "Attempting to reconnect (attempt $reconnectAttempts)")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Attempting to reconnect (attempt $reconnectAttempts)")
             startConnection()
         } else {
-            Log.e(TAG, "Max reconnection attempts reached")
+            if (BuildConfig.DEBUG) Log.e(TAG, "Max reconnection attempts reached")
             _connectionState.value = ConnectionState.Error("Connection lost")
         }
     }
@@ -197,7 +198,7 @@ class BillingClientWrapper(
             billingClient.queryProductDetailsAsync(params) { billingResult, productDetailsList ->
                 when (billingResult.responseCode) {
                     BillingClient.BillingResponseCode.OK -> {
-                        Log.d(TAG, "Product details query successful: ${productDetailsList.size} products")
+                        if (BuildConfig.DEBUG) Log.d(TAG, "Product details query successful: ${productDetailsList.size} products")
 
                         // Cache the product details
                         val detailsMap = productDetailsList.associateBy { it.productId }
@@ -206,7 +207,7 @@ class BillingClientWrapper(
                         continuation.resume(Result.success(productDetailsList))
                     }
                     else -> {
-                        Log.e(TAG, "Product details query failed: ${billingResult.debugMessage}")
+                        if (BuildConfig.DEBUG) Log.e(TAG, "Product details query failed: ${billingResult.debugMessage}")
                         continuation.resume(
                             Result.failure(
                                 BillingException(
@@ -254,7 +255,7 @@ class BillingClientWrapper(
             .setProductDetailsParamsList(listOf(productDetailsParams))
             .build()
 
-        Log.d(TAG, "Launching billing flow for ${productDetails.productId}")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Launching billing flow for ${productDetails.productId}")
         return billingClient.launchBillingFlow(activity, billingFlowParams)
     }
 
@@ -290,7 +291,7 @@ class BillingClientWrapper(
     ) {
         when (billingResult.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
-                Log.d(TAG, "Purchases updated: ${purchases?.size ?: 0} purchases")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Purchases updated: ${purchases?.size ?: 0} purchases")
                 purchases?.forEach { purchase ->
                     when (purchase.purchaseState) {
                         Purchase.PurchaseState.PURCHASED -> {
@@ -301,17 +302,17 @@ class BillingClientWrapper(
                             _purchaseEvents.trySend(PurchaseEvent.PurchasePending(purchase))
                         }
                         else -> {
-                            Log.w(TAG, "Unknown purchase state: ${purchase.purchaseState}")
+                            if (BuildConfig.DEBUG) Log.w(TAG, "Unknown purchase state: ${purchase.purchaseState}")
                         }
                     }
                 }
             }
             BillingClient.BillingResponseCode.USER_CANCELED -> {
-                Log.d(TAG, "User cancelled purchase")
+                if (BuildConfig.DEBUG) Log.d(TAG, "User cancelled purchase")
                 _purchaseEvents.trySend(PurchaseEvent.PurchaseCancelled)
             }
             else -> {
-                Log.e(TAG, "Purchase failed: ${billingResult.debugMessage}")
+                if (BuildConfig.DEBUG) Log.e(TAG, "Purchase failed: ${billingResult.debugMessage}")
                 _purchaseEvents.trySend(
                     PurchaseEvent.PurchaseError(
                         billingResult.responseCode,
@@ -340,12 +341,12 @@ class BillingClientWrapper(
             billingClient.queryPurchasesAsync(params) { billingResult, purchasesList ->
                 when (billingResult.responseCode) {
                     BillingClient.BillingResponseCode.OK -> {
-                        Log.d(TAG, "Query purchases successful: ${purchasesList.size} purchases")
+                        if (BuildConfig.DEBUG) Log.d(TAG, "Query purchases successful: ${purchasesList.size} purchases")
                         _purchases.value = purchasesList
                         continuation.resume(Result.success(purchasesList))
                     }
                     else -> {
-                        Log.e(TAG, "Query purchases failed: ${billingResult.debugMessage}")
+                        if (BuildConfig.DEBUG) Log.e(TAG, "Query purchases failed: ${billingResult.debugMessage}")
                         continuation.resume(
                             Result.failure(
                                 BillingException(
@@ -368,7 +369,7 @@ class BillingClientWrapper(
      */
     suspend fun acknowledgePurchase(purchase: Purchase): Result<Unit> {
         if (purchase.isAcknowledged) {
-            Log.d(TAG, "Purchase already acknowledged")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Purchase already acknowledged")
             return Result.success(Unit)
         }
 
@@ -384,11 +385,11 @@ class BillingClientWrapper(
             billingClient.acknowledgePurchase(params) { billingResult ->
                 when (billingResult.responseCode) {
                     BillingClient.BillingResponseCode.OK -> {
-                        Log.d(TAG, "Purchase acknowledged successfully")
+                        if (BuildConfig.DEBUG) Log.d(TAG, "Purchase acknowledged successfully")
                         continuation.resume(Result.success(Unit))
                     }
                     else -> {
-                        Log.e(TAG, "Acknowledge failed: ${billingResult.debugMessage}")
+                        if (BuildConfig.DEBUG) Log.e(TAG, "Acknowledge failed: ${billingResult.debugMessage}")
                         continuation.resume(
                             Result.failure(
                                 BillingException(

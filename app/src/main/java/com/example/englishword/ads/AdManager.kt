@@ -14,6 +14,7 @@ import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.example.englishword.di.ApplicationScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,7 +37,8 @@ import javax.inject.Singleton
 @Singleton
 class AdManager @Inject constructor(
     private val context: Context,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    @ApplicationScope private val coroutineScope: CoroutineScope
 ) {
     companion object {
         private const val TAG = "AdManager"
@@ -76,8 +78,6 @@ class AdManager @Inject constructor(
 
     // Frequency cap counter for interstitial ads
     private var studyCompletionCount = 0
-
-    private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
     init {
         // Observe premium status
