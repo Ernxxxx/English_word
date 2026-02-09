@@ -76,14 +76,17 @@ fun LevelCard(
     val hapticFeedback = LocalHapticFeedback.current
     var showMenu by remember { mutableStateOf(false) }
 
-    // Animate progress
-    val animatedProgress by animateFloatAsState(
+    // Animate progress (mastered + in-progress combined)
+    val animatedMasteredProgress by animateFloatAsState(
+        targetValue = levelWithProgress.masteredFraction,
+        animationSpec = tween(durationMillis = 500),
+        label = "mastered_progress_animation"
+    )
+    val animatedTotalProgress by animateFloatAsState(
         targetValue = levelWithProgress.progressFraction,
         animationSpec = tween(durationMillis = 500),
-        label = "progress_animation"
+        label = "total_progress_animation"
     )
-
-    // Use Material Icon instead of emoji
 
     // Determine progress color
     val progressColor by animateColorAsState(
@@ -176,9 +179,11 @@ fun LevelCard(
                     // Progress text
                     Text(
                         text = if (levelWithProgress.isEmpty) {
-                            "No words yet"
+                            "単語未登録"
+                        } else if (levelWithProgress.inProgressCount > 0 || levelWithProgress.masteredCount > 0) {
+                            "学習中 ${levelWithProgress.inProgressCount} / 習得 ${levelWithProgress.masteredCount} / 全${levelWithProgress.wordCount}語"
                         } else {
-                            "${levelWithProgress.masteredCount} / ${levelWithProgress.wordCount} words mastered"
+                            "全${levelWithProgress.wordCount}語"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -239,16 +244,17 @@ fun LevelCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Progress bar
+            // Two-stage progress bar
             if (!levelWithProgress.isEmpty) {
-                LinearProgressIndicator(
-                    progress = { animatedProgress },
+                TwoStageProgressBar(
+                    masteredFraction = animatedMasteredProgress,
+                    totalFraction = animatedTotalProgress,
+                    masteredColor = CorrectGreen,
+                    learningColor = progressColor.copy(alpha = 0.45f),
+                    trackColor = progressColor.copy(alpha = 0.12f),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    color = progressColor,
-                    trackColor = progressColor.copy(alpha = 0.15f)
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -265,9 +271,9 @@ fun LevelCard(
                         fontWeight = FontWeight.Medium
                     )
 
-                    if (levelWithProgress.learningCount > 0) {
+                    if (levelWithProgress.notStartedCount > 0) {
                         Text(
-                            text = "${levelWithProgress.learningCount} to go",
+                            text = "残り${levelWithProgress.notStartedCount}語",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -286,7 +292,7 @@ fun LevelCard(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Tap to add words",
+                    text = "タップして単語を追加",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
@@ -295,6 +301,46 @@ fun LevelCard(
     }
 }
 
+
+/**
+ * Two-stage progress bar showing mastered (solid) and learning (lighter) segments.
+ */
+@Composable
+private fun TwoStageProgressBar(
+    masteredFraction: Float,
+    totalFraction: Float,
+    masteredColor: Color,
+    learningColor: Color,
+    trackColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(trackColor)
+    ) {
+        // Learning segment (mastered + in-progress)
+        if (totalFraction > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(totalFraction.coerceIn(0f, 1f))
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(learningColor)
+            )
+        }
+        // Mastered segment (overlaid on top)
+        if (masteredFraction > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(masteredFraction.coerceIn(0f, 1f))
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(masteredColor)
+            )
+        }
+    }
+}
 
 /**
  * A compact version of the level card for smaller displays.

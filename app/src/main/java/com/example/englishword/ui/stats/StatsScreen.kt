@@ -22,19 +22,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -46,6 +50,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -67,6 +73,51 @@ fun StatsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
+    // SRS Explanation Dialog
+    if (uiState.showSrsExplanation) {
+        AlertDialog(
+            onDismissRequest = { viewModel.hideSrsExplanation() },
+            title = { Text("習得単語とは？") },
+            text = {
+                Text(
+                    "単語の習熟度は5段階で上がります。\n\n" +
+                    "1回目「覚えた」→ 1時間後に復習\n" +
+                    "2回目「覚えた」→ 8時間後に復習\n" +
+                    "3回目「覚えた」→ 1日後に復習\n" +
+                    "4回目「覚えた」→ 3日後に復習\n" +
+                    "5回目「覚えた」→ 習得完了\n\n" +
+                    "同じ単語を間隔を空けて5回正解すると「習得済み」になります。" +
+                    "これは科学的に効果が証明されている間隔反復学習（SRS）です。"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.hideSrsExplanation() }) {
+                    Text("閉じる")
+                }
+            }
+        )
+    }
+
+    // Mastered Words Detail Dialog
+    if (uiState.showMasteredWordsDialog) {
+        WordListDialog(
+            title = "習得済みの単語",
+            words = uiState.masteredWordsList,
+            emptyMessage = "まだ習得済みの単語はありません",
+            onDismiss = { viewModel.hideMasteredWordsDialog() }
+        )
+    }
+
+    // Today's Studied Words Detail Dialog
+    if (uiState.showTodayWordsDialog) {
+        WordListDialog(
+            title = "今日学習した単語",
+            words = uiState.todayWordsList,
+            emptyMessage = "今日はまだ学習していません",
+            onDismiss = { viewModel.hideTodayWordsDialog() }
+        )
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -116,6 +167,9 @@ fun StatsScreen(
         ) {
             StatsContent(
                 uiState = uiState,
+                onMasteredCardClick = { viewModel.showMasteredWordsDialog() },
+                onTodayCardClick = { viewModel.showTodayWordsDialog() },
+                onSrsHelpClick = { viewModel.showSrsExplanation() },
                 modifier = Modifier.padding(paddingValues)
             )
         }
@@ -125,6 +179,9 @@ fun StatsScreen(
 @Composable
 private fun StatsContent(
     uiState: StatsUiState,
+    onMasteredCardClick: () -> Unit = {},
+    onTodayCardClick: () -> Unit = {},
+    onSrsHelpClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -134,7 +191,12 @@ private fun StatsContent(
     ) {
         // Section 1: Overview Cards (2x2 grid)
         item {
-            OverviewCardsSection(uiState = uiState)
+            OverviewCardsSection(
+                uiState = uiState,
+                onMasteredCardClick = onMasteredCardClick,
+                onTodayCardClick = onTodayCardClick,
+                onSrsHelpClick = onSrsHelpClick
+            )
         }
 
         // Section 2: Weekly Study Chart
@@ -191,7 +253,12 @@ private fun StatsContent(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun OverviewCardsSection(uiState: StatsUiState) {
+private fun OverviewCardsSection(
+    uiState: StatsUiState,
+    onMasteredCardClick: () -> Unit = {},
+    onTodayCardClick: () -> Unit = {},
+    onSrsHelpClick: () -> Unit = {}
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // First row
         Row(
@@ -199,21 +266,24 @@ private fun OverviewCardsSection(uiState: StatsUiState) {
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             StatCard(
-                title = "\u7fd2\u5f97\u5358\u8a9e",
+                title = "習得単語",
                 value = "${uiState.totalWordsMastered}",
-                subtitle = "/ ${uiState.totalWords}\u8a9e",
+                subtitle = "/ ${uiState.totalWords}語",
                 icon = Icons.Default.CheckCircle,
                 iconTint = CorrectGreen,
                 progress = if (uiState.totalWords > 0) {
                     uiState.totalWordsMastered.toFloat() / uiState.totalWords
                 } else 0f,
+                onClick = onMasteredCardClick,
+                helpIcon = true,
+                onHelpClick = onSrsHelpClick,
                 modifier = Modifier.weight(1f)
             )
 
             StatCard(
-                title = "\u9023\u7d9a\u8a18\u9332",
+                title = "連続記録",
                 value = "${uiState.currentStreak}",
-                subtitle = "\u65e5",
+                subtitle = "日",
                 icon = Icons.Default.LocalFireDepartment,
                 iconTint = StreakOrange,
                 modifier = Modifier.weight(1f)
@@ -226,18 +296,19 @@ private fun OverviewCardsSection(uiState: StatsUiState) {
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             StatCard(
-                title = "\u4eca\u65e5\u306e\u5b66\u7fd2",
+                title = "今日の学習",
                 value = "${uiState.totalWordsStudied}",
-                subtitle = "\u8a9e",
+                subtitle = "語",
                 icon = Icons.Default.School,
                 iconTint = MaterialTheme.colorScheme.primary,
+                onClick = onTodayCardClick,
                 modifier = Modifier.weight(1f)
             )
 
             StatCard(
-                title = "\u65e5\u5e73\u5747",
+                title = "日平均",
                 value = String.format("%.1f", uiState.averageDaily),
-                subtitle = "\u8a9e/\u65e5",
+                subtitle = "語/日",
                 icon = Icons.Default.Speed,
                 iconTint = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.weight(1f)
@@ -254,10 +325,15 @@ private fun StatCard(
     icon: ImageVector? = null,
     iconTint: Color = MaterialTheme.colorScheme.primary,
     progress: Float? = null,
+    onClick: (() -> Unit)? = null,
+    helpIcon: Boolean = false,
+    onHelpClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     ElevatedCard(
-        modifier = modifier,
+        modifier = modifier.then(
+            if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+        ),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.elevatedCardColors(
@@ -269,21 +345,38 @@ private fun StatCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Icon with tinted background
+            // Icon row with optional help icon
             if (icon != null) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(iconTint.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = iconTint,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(iconTint.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = iconTint,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    if (helpIcon && onHelpClick != null) {
+                        Icon(
+                            imageVector = Icons.Default.HelpOutline,
+                            contentDescription = "説明を見る",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clickable(onClick = onHelpClick)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -316,14 +409,26 @@ private fun StatCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Card title
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            // Card title with tap hint
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (onClick != null) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "詳細 >",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                    )
+                }
+            }
 
             // Optional progress indicator
             if (progress != null) {
@@ -340,6 +445,95 @@ private fun StatCard(
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Word List Detail Dialog
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun WordListDialog(
+    title: String,
+    words: List<WordSummary>,
+    emptyMessage: String,
+    onDismiss: () -> Unit
+) {
+    val masteryLabels = listOf("未学習", "学習開始", "学習中", "定着中", "ほぼ習得", "習得済み")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(title)
+                Text(
+                    text = "${words.size}語",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        text = {
+            if (words.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = emptyMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.height(360.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    items(words) { word ->
+                        Column {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = word.english,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = word.japanese,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Text(
+                                    text = masteryLabels.getOrElse(word.masteryLevel) { "Lv${word.masteryLevel}" },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("閉じる")
+            }
+        }
+    )
 }
 
 // ---------------------------------------------------------------------------

@@ -16,9 +16,14 @@ data class LevelWithProgress(
     val wordCount: Int,
 
     /**
-     * Number of words that have been mastered (reached max SRS level).
+     * Number of words that have been mastered (reached max SRS level = 5).
      */
     val masteredCount: Int,
+
+    /**
+     * Number of words currently being learned (mastery level 1-4).
+     */
+    val inProgressCount: Int = 0,
 
     /**
      * Whether this level is locked (free tier only).
@@ -33,19 +38,37 @@ data class LevelWithProgress(
     val remainingUnlockTimeMs: Long = 0
 ) {
     /**
-     * Gets the progress as a fraction (0.0 to 1.0).
+     * Gets the mastered progress as a fraction (0.0 to 1.0).
      */
-    val progressFraction: Float
+    val masteredFraction: Float
         get() = if (wordCount == 0) 0f else masteredCount.toFloat() / wordCount
 
     /**
-     * Gets the progress as a percentage (0-100).
+     * Gets the in-progress (learning) fraction (0.0 to 1.0).
      */
-    val progressPercent: Int
-        get() = if (wordCount == 0) 0 else (masteredCount * 100) / wordCount
+    val inProgressFraction: Float
+        get() = if (wordCount == 0) 0f else inProgressCount.toFloat() / wordCount
 
     /**
-     * Gets the number of words still being learned.
+     * Gets the total progress fraction (mastered + in-progress).
+     */
+    val progressFraction: Float
+        get() = if (wordCount == 0) 0f else (masteredCount + inProgressCount).toFloat() / wordCount
+
+    /**
+     * Gets the total progress as a percentage (0-100).
+     */
+    val progressPercent: Int
+        get() = if (wordCount == 0) 0 else ((masteredCount + inProgressCount) * 100) / wordCount
+
+    /**
+     * Gets the number of words not yet started (mastery = 0).
+     */
+    val notStartedCount: Int
+        get() = wordCount - masteredCount - inProgressCount
+
+    /**
+     * Gets the number of words still to master.
      */
     val learningCount: Int
         get() = wordCount - masteredCount

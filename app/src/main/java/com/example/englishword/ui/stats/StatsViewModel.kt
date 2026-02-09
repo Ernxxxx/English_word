@@ -3,6 +3,7 @@ package com.example.englishword.ui.stats
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.englishword.data.local.dao.WordDao
 import com.example.englishword.data.repository.StudyRepository
 import com.example.englishword.data.repository.WordRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,6 +44,15 @@ data class MasteryLevel(
 /**
  * UI state for the Statistics screen.
  */
+/**
+ * Simple word summary for detail dialogs.
+ */
+data class WordSummary(
+    val english: String,
+    val japanese: String,
+    val masteryLevel: Int
+)
+
 data class StatsUiState(
     val weeklyData: List<DailyStudyData> = emptyList(),
     val monthlyData: List<DailyStudyData> = emptyList(),
@@ -53,7 +63,12 @@ data class StatsUiState(
     val totalWords: Int = 0,
     val averageDaily: Float = 0f,
     val masteryDistribution: List<MasteryLevel> = emptyList(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val showMasteredWordsDialog: Boolean = false,
+    val showTodayWordsDialog: Boolean = false,
+    val showSrsExplanation: Boolean = false,
+    val masteredWordsList: List<WordSummary> = emptyList(),
+    val todayWordsList: List<WordSummary> = emptyList()
 )
 
 /**
@@ -65,7 +80,8 @@ data class StatsUiState(
 @HiltViewModel
 class StatsViewModel @Inject constructor(
     private val studyRepository: StudyRepository,
-    private val wordRepository: WordRepository
+    private val wordRepository: WordRepository,
+    private val wordDao: WordDao
 ) : ViewModel() {
 
     companion object {
@@ -197,5 +213,42 @@ class StatsViewModel @Inject constructor(
      */
     fun refresh() {
         loadStats()
+    }
+
+    // ==================== Dialog Control ====================
+
+    fun showSrsExplanation() {
+        _uiState.update { it.copy(showSrsExplanation = true) }
+    }
+
+    fun hideSrsExplanation() {
+        _uiState.update { it.copy(showSrsExplanation = false) }
+    }
+
+    fun showMasteredWordsDialog() {
+        viewModelScope.launch {
+            val words = wordDao.getMasteredWordsListSync().map {
+                WordSummary(english = it.english, japanese = it.japanese, masteryLevel = it.masteryLevel)
+            }
+            _uiState.update { it.copy(showMasteredWordsDialog = true, masteredWordsList = words) }
+        }
+    }
+
+    fun hideMasteredWordsDialog() {
+        _uiState.update { it.copy(showMasteredWordsDialog = false) }
+    }
+
+    fun showTodayWordsDialog() {
+        viewModelScope.launch {
+            val todayStart = LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            val words = wordDao.getTodayStudiedWordsSync(todayStart).map {
+                WordSummary(english = it.english, japanese = it.japanese, masteryLevel = it.masteryLevel)
+            }
+            _uiState.update { it.copy(showTodayWordsDialog = true, todayWordsList = words) }
+        }
+    }
+
+    fun hideTodayWordsDialog() {
+        _uiState.update { it.copy(showTodayWordsDialog = false) }
     }
 }
