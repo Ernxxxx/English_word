@@ -53,6 +53,7 @@ import com.example.englishword.ui.theme.MasteryLevel4
 import com.example.englishword.ui.theme.MasteryLevel5
 import com.example.englishword.ui.theme.StreakOrange
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 // ============================================================
 // Data Classes
@@ -62,20 +63,30 @@ import java.time.LocalDate
 // 1. WeeklyBarChart
 // ============================================================
 
-private val DayLabelsJapanese = listOf("月", "火", "水", "木", "金", "土", "日")
+private val DayLabelsJapanese = mapOf(
+    java.time.DayOfWeek.MONDAY to "月",
+    java.time.DayOfWeek.TUESDAY to "火",
+    java.time.DayOfWeek.WEDNESDAY to "水",
+    java.time.DayOfWeek.THURSDAY to "木",
+    java.time.DayOfWeek.FRIDAY to "金",
+    java.time.DayOfWeek.SATURDAY to "土",
+    java.time.DayOfWeek.SUNDAY to "日"
+)
+
+private val chartDateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
 /**
  * A bar chart displaying study counts for each day of the week.
  *
  * Features:
  * - 7 vertical bars with rounded top corners
- * - Japanese day labels on the X-axis
+ * - Japanese day labels derived from actual data dates
  * - Word count values above each bar
  * - Current day highlighted with a distinct color
  * - Subtle grid lines for readability
  * - Animated bar growth on first composition
  *
- * @param data List of 7 [DailyStudyData] entries, one for each day (Mon-Sun)
+ * @param data List of 7 [DailyStudyData] entries, ordered chronologically (oldest first)
  * @param modifier Modifier for the composable
  */
 @Composable
@@ -92,9 +103,16 @@ fun WeeklyBarChart(
     val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
     val outlineVariantColor = MaterialTheme.colorScheme.outlineVariant
 
-    val todayIndex = remember {
-        // java.time.DayOfWeek: MONDAY=1, SUNDAY=7. Convert to 0-indexed (Mon=0).
-        LocalDate.now().dayOfWeek.value - 1
+    // Derive day labels and today-index from actual data dates
+    val todayStr = remember { LocalDate.now().format(chartDateFormatter) }
+    val todayIndex = remember(data) {
+        data.indexOfFirst { it.date == todayStr }.takeIf { it >= 0 } ?: (data.size - 1)
+    }
+    val dayLabels = remember(data) {
+        data.map { entry ->
+            val date = LocalDate.parse(entry.date, chartDateFormatter)
+            DayLabelsJapanese[date.dayOfWeek] ?: "?"
+        }
     }
 
     val maxCount = remember(data) { data.maxOfOrNull { it.count } ?: 1 }
@@ -235,7 +253,7 @@ fun WeeklyBarChart(
                     }
                 }
                 drawText(
-                    DayLabelsJapanese[i],
+                    dayLabels[i],
                     x + barWidth / 2,
                     canvasHeight - 4f,
                     paint
@@ -305,6 +323,8 @@ fun MonthlyHeatmap(
     // DayOfWeek.MONDAY = 1 ... SUNDAY = 7, convert to 0-indexed (Mon=0)
     val startOffset = remember(firstDayOfMonth) { firstDayOfMonth.dayOfWeek.value - 1 }
 
+    // Build a lookup map from date string to count for O(1) access
+    val dataMap = remember(data) { data.associate { it.date to it.count } }
     val maxCount = remember(data) { data.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1 }
 
     // Animation
@@ -331,10 +351,16 @@ fun MonthlyHeatmap(
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
+        // Dynamic height: 6 rows need more space than 5
+        val totalRows = remember(startOffset, daysInMonth) {
+            (startOffset + daysInMonth + 6) / 7
+        }
+        val canvasHeightDp = if (totalRows > 5) 180.dp else 150.dp
+
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(150.dp)
+                .height(canvasHeightDp)
         ) {
             val canvasWidth = size.width
             val canvasHeight = size.height
@@ -345,7 +371,8 @@ fun MonthlyHeatmap(
 
             val gridWidth = canvasWidth - sidePadding * 2
             val cols = 7
-            val rows = 5
+            // Dynamically calculate rows based on month layout
+            val rows = ((startOffset + daysInMonth + 6) / 7)
             val cellSize = ((gridWidth - (cols - 1) * cellSpacing) / cols)
                 .coerceAtMost((canvasHeight - headerHeight - (rows - 1) * cellSpacing) / rows)
             val cornerRadiusPx = cellSize * 0.2f
@@ -386,9 +413,10 @@ fun MonthlyHeatmap(
                             cornerRadius = CornerRadius(cornerRadiusPx, cornerRadiusPx)
                         )
                     } else {
-                        // Find study data for this day
-                        val dayData = data.getOrNull(dayOfMonth - 1)
-                        val count = dayData?.count ?: 0
+                        // Look up study data by date string
+                        val dateStr = firstDayOfMonth.plusDays((dayOfMonth - 1).toLong())
+                            .format(chartDateFormatter)
+                        val count = dataMap[dateStr] ?: 0
                         val intensity = if (count == 0) 0f else {
                             (count.toFloat() / maxCount).coerceIn(0.1f, 1f)
                         }
