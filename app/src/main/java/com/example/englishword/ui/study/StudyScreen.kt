@@ -13,8 +13,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -342,18 +347,21 @@ private fun StudyingContent(
             isFlipped = state.isFlipped,
             onFlip = onFlipCard,
             isReversed = state.isReversed,
-            onSpeakClick = onSpeakWord,
-            isTtsReady = isTtsReady,
-            isSpeaking = isTtsSpeaking,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         if (state.isFlipped) {
-            // カードめくり後: 評価ボタン表示
+            // カードめくり後: 発音ボタン＋評価ボタン
+            SpeakButton(
+                onSpeakWord = onSpeakWord,
+                isTtsReady = isTtsReady,
+                isTtsSpeaking = isTtsSpeaking
+            )
+            Spacer(modifier = Modifier.height(12.dp))
             EvaluationButtons(
                 onEvaluate = onEvaluate,
                 enabled = true
@@ -421,6 +429,43 @@ private fun MasteryInfoRow(currentWord: Word) {
             text = "復習 ${currentWord.reviewCount}回",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/**
+ * Prominent speak button displayed outside the flash card.
+ */
+@Composable
+private fun SpeakButton(
+    onSpeakWord: () -> Unit,
+    isTtsReady: Boolean,
+    isTtsSpeaking: Boolean
+) {
+    Button(
+        onClick = onSpeakWord,
+        enabled = isTtsReady,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+        )
+    ) {
+        Icon(
+            imageVector = Icons.Default.VolumeUp,
+            contentDescription = null,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = if (isTtsSpeaking) "再生中..." else "発音を聞く",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
