@@ -277,10 +277,22 @@ object Migrations {
      */
     val MIGRATION_7_8 = object : Migration(7, 8) {
         override fun migrate(database: SupportSQLiteDatabase) {
-            // Remove duplicates keeping the row with highest masteryLevel (or highest id as tiebreaker)
+            // Remove duplicates keeping the row with highest masteryLevel
+            // (and highest id as tiebreaker when masteryLevel is equal).
             database.execSQL("""
                 DELETE FROM words WHERE id NOT IN (
-                    SELECT MAX(id) FROM words GROUP BY levelId, english
+                    SELECT id FROM (
+                        SELECT w1.id
+                        FROM words w1
+                        WHERE w1.id = (
+                            SELECT w2.id
+                            FROM words w2
+                            WHERE w2.levelId = w1.levelId
+                              AND w2.english = w1.english
+                            ORDER BY w2.masteryLevel DESC, w2.id DESC
+                            LIMIT 1
+                        )
+                    )
                 )
             """.trimIndent())
             // Add unique constraint
