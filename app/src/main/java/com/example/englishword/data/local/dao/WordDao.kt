@@ -15,7 +15,8 @@ import kotlinx.coroutines.flow.Flow
 data class LevelWordStats(
     val levelId: Long,
     val wordCount: Int,
-    val masteredCount: Int
+    val masteredCount: Int,
+    val inProgressCount: Int
 )
 
 /**
@@ -32,7 +33,8 @@ interface WordDao {
     @Query("""
         SELECT levelId,
                COUNT(*) as wordCount,
-               SUM(CASE WHEN masteryLevel >= 5 THEN 1 ELSE 0 END) as masteredCount
+               SUM(CASE WHEN masteryLevel >= 5 THEN 1 ELSE 0 END) as masteredCount,
+               SUM(CASE WHEN masteryLevel >= 1 AND masteryLevel < 5 THEN 1 ELSE 0 END) as inProgressCount
         FROM words
         GROUP BY levelId
     """)
@@ -148,6 +150,19 @@ interface WordDao {
     // Mastery distribution for statistics screen
     @Query("SELECT masteryLevel, COUNT(*) as count FROM words GROUP BY masteryLevel ORDER BY masteryLevel ASC")
     suspend fun getMasteryDistribution(): List<MasteryCount>
+
+    // Get all mastered words (for stats detail view)
+    @Query("SELECT * FROM words WHERE masteryLevel >= 5 ORDER BY updatedAt DESC")
+    suspend fun getMasteredWordsListSync(): List<Word>
+
+    // Get words studied today (from study records)
+    @Query("""
+        SELECT DISTINCT w.* FROM words w
+        INNER JOIN study_records sr ON w.id = sr.wordId
+        WHERE sr.reviewedAt >= :todayStartMs
+        ORDER BY sr.reviewedAt DESC
+    """)
+    suspend fun getTodayStudiedWordsSync(todayStartMs: Long): List<Word>
 
     // Update mastery level
     @Query("""

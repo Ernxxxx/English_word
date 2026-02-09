@@ -177,6 +177,7 @@ class HomeViewModel @Inject constructor(
         val stats = statsMap[level.id]
         val wordCount = stats?.wordCount ?: 0
         val masteredCount = stats?.masteredCount ?: 0
+        val inProgressCount = stats?.inProgressCount ?: 0
 
         // Check if this is a child level (unit) and needs unlock check
         val isParentLevel = level.parentId == null
@@ -197,6 +198,7 @@ class HomeViewModel @Inject constructor(
             ),
             wordCount = wordCount,
             masteredCount = masteredCount,
+            inProgressCount = inProgressCount,
             isLocked = isLocked,
             remainingUnlockTimeMs = remainingTime
         )
