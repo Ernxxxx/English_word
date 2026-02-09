@@ -62,10 +62,11 @@ interface WordDao {
     @Query("SELECT * FROM words WHERE english = :english LIMIT 1")
     suspend fun getWordByEnglish(english: String): Word?
 
-    // Get words that are due for review (nextReviewAt <= current time or new words)
+    // Get unmastered words that are due for review (nextReviewAt <= current time or new words)
     @Query("""
         SELECT * FROM words
         WHERE levelId = :levelId
+        AND masteryLevel < 5
         AND (nextReviewAt IS NULL OR nextReviewAt <= :currentTime)
         ORDER BY
             CASE WHEN nextReviewAt IS NULL THEN 0 ELSE 1 END,

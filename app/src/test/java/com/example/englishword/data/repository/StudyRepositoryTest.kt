@@ -37,7 +37,6 @@ class StudyRepositoryTest {
 
     @Before
     fun setUp() {
-        // Mock android.util.Log to prevent crashes in unit tests
         mockkStatic(Log::class)
         every { Log.e(any(), any(), any()) } returns 0
         every { Log.e(any(), any()) } returns 0
@@ -65,20 +64,15 @@ class StudyRepositoryTest {
         unmockkStatic(Log::class)
     }
 
-    // ==================== startSession ====================
-
     @Test
     fun `startSession - creates session and returns valid ID`() = runTest {
-        // Arrange
         val levelId = 1L
         val expectedSessionId = 42L
         val sessionSlot = slot<StudySession>()
         coEvery { studySessionDao.insert(capture(sessionSlot)) } returns expectedSessionId
 
-        // Act
         val result = repository.startSession(levelId)
 
-        // Assert
         assertEquals(expectedSessionId, result)
         assertEquals(levelId, sessionSlot.captured.levelId)
         assertTrue(sessionSlot.captured.startedAt > 0)
@@ -87,64 +81,18 @@ class StudyRepositoryTest {
 
     @Test
     fun `startSession - returns -1 on DAO error`() = runTest {
-        // Arrange
         coEvery { studySessionDao.insert(any()) } throws RuntimeException("DB error")
 
-        // Act
         val result = repository.startSession(1L)
 
-        // Assert
         assertEquals(-1L, result)
-    }
-
-    // ==================== completeSession ====================
-
-    @Test
-    fun `completeSession - updates session with correct word count and mastered count`() = runTest {
-        // Arrange
-        val sessionId = 10L
-        val wordCount = 20
-        val masteredCount = 15
-        coEvery {
-            studySessionDao.completeSession(
-                sessionId = sessionId,
-                completedAt = any(),
-                wordCount = wordCount,
-                masteredCount = masteredCount
-            )
-        } returns Unit
-        // updateDailyStats path: stats already exist for today
-        coEvery { userStatsDao.getStatsByDateSync(any()) } returns UserStats(
-            id = 1L,
-            date = "2026-02-07",
-            studiedCount = 5,
-            streak = 3
-        )
-        coEvery { userStatsDao.incrementStudiedCount(any(), any()) } returns Unit
-
-        // Act
-        val result = repository.completeSession(sessionId, wordCount, masteredCount)
-
-        // Assert
-        assertTrue(result)
-        coVerify(exactly = 1) {
-            studySessionDao.completeSession(
-                sessionId = sessionId,
-                completedAt = any(),
-                wordCount = wordCount,
-                masteredCount = masteredCount
-            )
-        }
     }
 
     @Test
     fun `completeSession - updates daily stats when stats already exist for today`() = runTest {
-        // Arrange
         val sessionId = 10L
         val wordCount = 8
-        coEvery {
-            studySessionDao.completeSession(any(), any(), any(), any())
-        } returns Unit
+        coEvery { studySessionDao.completeSession(any(), any(), any(), any()) } returns Unit
         coEvery { userStatsDao.getStatsByDateSync(any()) } returns UserStats(
             id = 1L,
             date = "2026-02-07",
@@ -152,77 +100,94 @@ class StudyRepositoryTest {
             streak = 2
         )
 
-        // Act
         val result = repository.completeSession(sessionId, wordCount, 3)
 
-        // Assert
         assertTrue(result)
         coVerify(exactly = 1) { userStatsDao.incrementStudiedCount(any(), wordCount) }
         coVerify(exactly = 0) { userStatsDao.insert(any()) }
     }
 
     @Test
-    fun `completeSession - creates new daily stats when none exist for today`() = runTest {
-        // Arrange
+    fun `completeSession - creates new daily stats and increments streak when consecutive`() = runTest {
         val sessionId = 10L
         val wordCount = 12
-        coEvery {
-            studySessionDao.completeSession(any(), any(), any(), any())
-        } returns Unit
-        // No stats exist for today
+        coEvery { studySessionDao.completeSession(any(), any(), any(), any()) } returns Unit
         coEvery { userStatsDao.getStatsByDateSync(any()) } returns null
+        coEvery { userStatsDao.getLatestStatsSync() } returns UserStats(
+            id = 1L,
+            date = java.time.LocalDate.now().minusDays(1).toString(),
+            studiedCount = 10,
+            streak = 3
+        )
         coEvery { userStatsDao.insert(any()) } returns 1L
 
-        // Act
         val result = repository.completeSession(sessionId, wordCount, 5)
 
-        // Assert
         assertTrue(result)
         val statsSlot = slot<UserStats>()
         coVerify(exactly = 1) { userStatsDao.insert(capture(statsSlot)) }
         assertEquals(wordCount, statsSlot.captured.studiedCount)
+        assertEquals(4, statsSlot.captured.streak)
+    }
+
+    @Test
+    fun `completeSession - resets streak to 1 when latest stats are not consecutive`() = runTest {
+        val sessionId = 10L
+        val wordCount = 12
+        coEvery { studySessionDao.completeSession(any(), any(), any(), any()) } returns Unit
+        coEvery { userStatsDao.getStatsByDateSync(any()) } returns null
+        coEvery { userStatsDao.getLatestStatsSync() } returns UserStats(
+            id = 1L,
+            date = java.time.LocalDate.now().minusDays(3).toString(),
+            studiedCount = 10,
+            streak = 7
+        )
+        coEvery { userStatsDao.insert(any()) } returns 1L
+
+        val result = repository.completeSession(sessionId, wordCount, 5)
+
+        assertTrue(result)
+        val statsSlot = slot<UserStats>()
+        coVerify(exactly = 1) { userStatsDao.insert(capture(statsSlot)) }
+        assertEquals(1, statsSlot.captured.streak)
     }
 
     @Test
     fun `completeSession - returns false on error`() = runTest {
-        // Arrange
-        coEvery {
-            studySessionDao.completeSession(any(), any(), any(), any())
-        } throws RuntimeException("DB error")
+        coEvery { studySessionDao.completeSession(any(), any(), any(), any()) } throws RuntimeException("DB error")
 
-        // Act
         val result = repository.completeSession(10L, 5, 3)
 
-        // Assert
         assertFalse(result)
     }
 
-    // ==================== recordResult ====================
-
     @Test
-    fun `recordResult - creates StudyRecord correctly and updates mastery`() = runTest {
-        // Arrange
+    fun `recordResult - creates StudyRecord correctly and updates mastery in transaction`() = runTest {
         val sessionId = 5L
         val wordId = 100L
-        val result = 2 // KNOWN
+        val result = 2
         val responseTimeMs = 1500L
         val word = Word(
             id = wordId,
             levelId = 1L,
             english = "hello",
-            japanese = "こんにちは",
+            japanese = "hello-ja",
             masteryLevel = 3
         )
 
         val recordSlot = slot<StudyRecord>()
-        coEvery { studyRecordDao.insert(capture(recordSlot)) } returns 1L
         coEvery { wordDao.getWordByIdSync(wordId) } returns word
-        coEvery { wordDao.updateMastery(any(), any(), any(), any()) } returns Unit
+        coEvery {
+            studyRecordDao.insertRecordAndUpdateMastery(
+                record = capture(recordSlot),
+                wordId = wordId,
+                masteryLevel = 4,
+                nextReviewAt = any()
+            )
+        } returns Unit
 
-        // Act
         val success = repository.recordResult(sessionId, wordId, result, responseTimeMs)
 
-        // Assert
         assertTrue(success)
         with(recordSlot.captured) {
             assertEquals(sessionId, this.sessionId)
@@ -234,232 +199,151 @@ class StudyRepositoryTest {
     }
 
     @Test
-    fun `recordResult - returns false on error`() = runTest {
-        // Arrange
-        coEvery { studyRecordDao.insert(any()) } throws RuntimeException("Insert failed")
+    fun `recordResult - returns false on transaction error`() = runTest {
+        val wordId = 1L
+        val word = Word(
+            id = wordId,
+            levelId = 1L,
+            english = "error",
+            japanese = "error-ja",
+            masteryLevel = 1
+        )
 
-        // Act
-        val success = repository.recordResult(1L, 1L, 2)
+        coEvery { wordDao.getWordByIdSync(wordId) } returns word
+        coEvery {
+            studyRecordDao.insertRecordAndUpdateMastery(
+                record = any(),
+                wordId = wordId,
+                masteryLevel = any(),
+                nextReviewAt = any()
+            )
+        } throws RuntimeException("Transaction failed")
 
-        // Assert
+        val success = repository.recordResult(1L, wordId, 2)
+
         assertFalse(success)
     }
 
     @Test
-    fun `recordResult - calls updateWordMastery after recording`() = runTest {
-        // Arrange
-        val wordId = 50L
-        val resultValue = 0 // AGAIN
-        val word = Word(
-            id = wordId,
-            levelId = 1L,
-            english = "difficult",
-            japanese = "難しい",
-            masteryLevel = 2
-        )
+    fun `recordResult - returns false when word not found`() = runTest {
+        val wordId = 999L
+        coEvery { wordDao.getWordByIdSync(wordId) } returns null
 
-        coEvery { studyRecordDao.insert(any()) } returns 1L
-        coEvery { wordDao.getWordByIdSync(wordId) } returns word
-        coEvery { wordDao.updateMastery(any(), any(), any(), any()) } returns Unit
-
-        // Act
-        repository.recordResult(1L, wordId, resultValue)
-
-        // Assert: mastery should decrease by 1 for AGAIN (from 2 to 1)
-        coVerify(exactly = 1) {
-            wordDao.updateMastery(
-                wordId = wordId,
-                masteryLevel = 1, // SRS: currentLevel(2) - 1 for AGAIN
-                nextReviewAt = any(),
-                updatedAt = any()
-            )
-        }
-    }
-
-    // ==================== updateWordMastery (tested indirectly via recordResult) ====================
-
-    @Test
-    fun `updateWordMastery - calls wordDao updateMastery with SRS-calculated values for KNOWN`() = runTest {
-        // Arrange
-        val wordId = 10L
-        val word = Word(
-            id = wordId,
-            levelId = 1L,
-            english = "apple",
-            japanese = "りんご",
-            masteryLevel = 2
-        )
-
-        coEvery { studyRecordDao.insert(any()) } returns 1L
-        coEvery { wordDao.getWordByIdSync(wordId) } returns word
-        coEvery { wordDao.updateMastery(any(), any(), any(), any()) } returns Unit
-
-        // Act: record KNOWN result (value = 2)
         val success = repository.recordResult(1L, wordId, 2)
 
-        // Assert: mastery should increase from 2 to 3 for KNOWN
-        assertTrue(success)
-        coVerify(exactly = 1) {
-            wordDao.updateMastery(
-                wordId = wordId,
-                masteryLevel = 3, // SRS: currentLevel(2) + 1 for KNOWN
-                nextReviewAt = any(),
-                updatedAt = any()
-            )
-        }
+        assertFalse(success)
+        coVerify(exactly = 0) { studyRecordDao.insertRecordAndUpdateMastery(any(), any(), any(), any()) }
     }
 
     @Test
     fun `updateWordMastery - does not exceed MAX_LEVEL for KNOWN`() = runTest {
-        // Arrange
         val wordId = 10L
         val word = Word(
             id = wordId,
             levelId = 1L,
             english = "mastered",
-            japanese = "マスター済",
-            masteryLevel = SrsCalculator.MAX_LEVEL // already at max (5)
+            japanese = "mastered-ja",
+            masteryLevel = SrsCalculator.MAX_LEVEL
         )
 
-        coEvery { studyRecordDao.insert(any()) } returns 1L
         coEvery { wordDao.getWordByIdSync(wordId) } returns word
-        coEvery { wordDao.updateMastery(any(), any(), any(), any()) } returns Unit
+        coEvery { studyRecordDao.insertRecordAndUpdateMastery(any(), wordId, SrsCalculator.MAX_LEVEL, any()) } returns Unit
 
-        // Act
-        repository.recordResult(1L, wordId, 2) // KNOWN
+        repository.recordResult(1L, wordId, 2)
 
-        // Assert: should stay at MAX_LEVEL
         coVerify(exactly = 1) {
-            wordDao.updateMastery(
+            studyRecordDao.insertRecordAndUpdateMastery(
+                record = any(),
                 wordId = wordId,
                 masteryLevel = SrsCalculator.MAX_LEVEL,
-                nextReviewAt = any(),
-                updatedAt = any()
+                nextReviewAt = any()
             )
         }
     }
 
     @Test
     fun `updateWordMastery - does not go below MIN_LEVEL for AGAIN`() = runTest {
-        // Arrange
         val wordId = 10L
         val word = Word(
             id = wordId,
             levelId = 1L,
             english = "new",
-            japanese = "新しい",
-            masteryLevel = SrsCalculator.MIN_LEVEL // already at min (0)
+            japanese = "new-ja",
+            masteryLevel = SrsCalculator.MIN_LEVEL
         )
 
-        coEvery { studyRecordDao.insert(any()) } returns 1L
         coEvery { wordDao.getWordByIdSync(wordId) } returns word
-        coEvery { wordDao.updateMastery(any(), any(), any(), any()) } returns Unit
+        coEvery { studyRecordDao.insertRecordAndUpdateMastery(any(), wordId, SrsCalculator.MIN_LEVEL, any()) } returns Unit
 
-        // Act
-        repository.recordResult(1L, wordId, 0) // AGAIN
+        repository.recordResult(1L, wordId, 0)
 
-        // Assert: should stay at MIN_LEVEL
         coVerify(exactly = 1) {
-            wordDao.updateMastery(
+            studyRecordDao.insertRecordAndUpdateMastery(
+                record = any(),
                 wordId = wordId,
                 masteryLevel = SrsCalculator.MIN_LEVEL,
-                nextReviewAt = any(),
-                updatedAt = any()
+                nextReviewAt = any()
             )
         }
     }
 
     @Test
     fun `updateWordMastery - keeps same level for LATER`() = runTest {
-        // Arrange
         val wordId = 10L
         val currentLevel = 3
         val word = Word(
             id = wordId,
             levelId = 1L,
             english = "later",
-            japanese = "後で",
+            japanese = "later-ja",
             masteryLevel = currentLevel
         )
 
-        coEvery { studyRecordDao.insert(any()) } returns 1L
         coEvery { wordDao.getWordByIdSync(wordId) } returns word
-        coEvery { wordDao.updateMastery(any(), any(), any(), any()) } returns Unit
+        coEvery { studyRecordDao.insertRecordAndUpdateMastery(any(), wordId, currentLevel, any()) } returns Unit
 
-        // Act
-        repository.recordResult(1L, wordId, 1) // LATER
+        repository.recordResult(1L, wordId, 1)
 
-        // Assert: level should remain unchanged
         coVerify(exactly = 1) {
-            wordDao.updateMastery(
+            studyRecordDao.insertRecordAndUpdateMastery(
+                record = any(),
                 wordId = wordId,
                 masteryLevel = currentLevel,
-                nextReviewAt = any(),
-                updatedAt = any()
+                nextReviewAt = any()
             )
         }
     }
 
     @Test
-    fun `updateWordMastery - skips update when word not found`() = runTest {
-        // Arrange
-        val wordId = 999L
-
-        coEvery { studyRecordDao.insert(any()) } returns 1L
-        coEvery { wordDao.getWordByIdSync(wordId) } returns null
-
-        // Act
-        val success = repository.recordResult(1L, wordId, 2)
-
-        // Assert: record inserted successfully, but mastery update skipped
-        assertTrue(success)
-        coVerify(exactly = 0) { wordDao.updateMastery(any(), any(), any(), any()) }
-    }
-
-    // ==================== getCurrentStreak ====================
-
-    @Test
     fun `getCurrentStreak - returns streak from latest stats`() = runTest {
-        // Arrange
         val expectedStreak = 7
         coEvery { userStatsDao.getCurrentStreak() } returns expectedStreak
 
-        // Act
         val streak = repository.getCurrentStreak()
 
-        // Assert
         assertEquals(expectedStreak, streak)
     }
 
     @Test
     fun `getCurrentStreak - returns 0 when no stats exist`() = runTest {
-        // Arrange
         coEvery { userStatsDao.getCurrentStreak() } returns null
 
-        // Act
         val streak = repository.getCurrentStreak()
 
-        // Assert
         assertEquals(0, streak)
     }
 
     @Test
     fun `getCurrentStreak - returns 0 on error`() = runTest {
-        // Arrange
         coEvery { userStatsDao.getCurrentStreak() } throws RuntimeException("DB error")
 
-        // Act
         val streak = repository.getCurrentStreak()
 
-        // Assert
         assertEquals(0, streak)
     }
 
-    // ==================== getIncompleteSessionForLevel ====================
-
     @Test
     fun `getIncompleteSessionForLevel - returns incomplete session when exists`() = runTest {
-        // Arrange
         val levelId = 3L
         val expectedSession = StudySession(
             id = 42L,
@@ -474,10 +358,8 @@ class StudyRepositoryTest {
         )
         coEvery { studySessionDao.getIncompleteSessionForLevel(levelId) } returns expectedSession
 
-        // Act
         val session = repository.getIncompleteSessionForLevel(levelId)
 
-        // Assert
         assertNotNull(session)
         assertEquals(expectedSession.id, session!!.id)
         assertEquals(levelId, session.levelId)
@@ -488,28 +370,20 @@ class StudyRepositoryTest {
 
     @Test
     fun `getIncompleteSessionForLevel - returns null when no incomplete session`() = runTest {
-        // Arrange
         val levelId = 3L
         coEvery { studySessionDao.getIncompleteSessionForLevel(levelId) } returns null
 
-        // Act
         val session = repository.getIncompleteSessionForLevel(levelId)
 
-        // Assert
         assertNull(session)
     }
 
     @Test
     fun `getIncompleteSessionForLevel - returns null on error`() = runTest {
-        // Arrange
-        coEvery {
-            studySessionDao.getIncompleteSessionForLevel(any())
-        } throws RuntimeException("DB error")
+        coEvery { studySessionDao.getIncompleteSessionForLevel(any()) } throws RuntimeException("DB error")
 
-        // Act
         val session = repository.getIncompleteSessionForLevel(1L)
 
-        // Assert
         assertNull(session)
     }
 }

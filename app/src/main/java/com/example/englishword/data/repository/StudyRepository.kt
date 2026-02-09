@@ -278,7 +278,6 @@ class StudyRepository @Inject constructor(
         responseTimeMs: Long = 0L
     ): Boolean {
         return try {
-            // Insert the study record with response time
             val record = StudyRecord(
                 sessionId = sessionId,
                 wordId = wordId,
@@ -286,10 +285,16 @@ class StudyRepository @Inject constructor(
                 reviewedAt = System.currentTimeMillis(),
                 responseTimeMs = responseTimeMs
             )
-            studyRecordDao.insert(record)
 
-            // Update word mastery using SRS
-            updateWordMastery(wordId, result)
+            val (newMasteryLevel, nextReviewAt) = updateWordMastery(wordId, result)
+
+            // Insert result and mastery update in a single transaction.
+            studyRecordDao.insertRecordAndUpdateMastery(
+                record = record,
+                wordId = wordId,
+                masteryLevel = newMasteryLevel,
+                nextReviewAt = nextReviewAt
+            )
 
             true
         } catch (e: Exception) {
@@ -299,14 +304,15 @@ class StudyRepository @Inject constructor(
     }
 
     /**
-     * Update word mastery based on study result.
+     * Calculate next mastery values based on study result.
      * Delegates to SrsCalculator for consistent SRS logic across the app.
      *
-     * @param wordId The ID of the word to update
+     * @param wordId The ID of the word to calculate for
      * @param result The review result (0=AGAIN, 1=LATER, 2=KNOWN)
      */
-    private suspend fun updateWordMastery(wordId: Long, result: Int) {
-        val word = wordDao.getWordByIdSync(wordId) ?: return
+    private suspend fun updateWordMastery(wordId: Long, result: Int): Pair<Int, Long?> {
+        val word = wordDao.getWordByIdSync(wordId)
+            ?: throw IllegalStateException("Word not found for mastery update: wordId=$wordId")
 
         // Use centralized SRS calculator for consistent mastery updates
         val (newMasteryLevel, nextReviewAt) = SrsCalculator.calculateNextReview(
@@ -314,11 +320,7 @@ class StudyRepository @Inject constructor(
             result = result
         )
 
-        wordDao.updateMastery(
-            wordId = wordId,
-            masteryLevel = newMasteryLevel,
-            nextReviewAt = nextReviewAt
-        )
+        return Pair(newMasteryLevel, nextReviewAt)
     }
 
     /**
@@ -374,19 +376,27 @@ class StudyRepository @Inject constructor(
      */
     private suspend fun updateDailyStats(wordsStudied: Int) {
         try {
-            val today = LocalDate.now().format(dateFormatter)
+            val todayDate = LocalDate.now()
+            val today = todayDate.format(dateFormatter)
             val existingStats = userStatsDao.getStatsByDateSync(today)
 
             if (existingStats != null) {
                 // Update existing stats
                 userStatsDao.incrementStudiedCount(today, wordsStudied)
             } else {
-                // Create new stats for today
-                val yesterday = getYesterdayDate()
-                val yesterdayStats = userStatsDao.getStatsByDateSync(yesterday)
+                // Create new stats for today.
+                // Use the latest recorded day to avoid carrying streak across 2+ day gaps.
+                val latestStats = userStatsDao.getLatestStatsSync()
+                val newStreak = if (latestStats != null && latestStats.studiedCount > 0) {
+                    val latestDate = runCatching {
+                        LocalDate.parse(latestStats.date, dateFormatter)
+                    }.getOrNull()
 
-                val newStreak = if (yesterdayStats != null && yesterdayStats.studiedCount > 0) {
-                    yesterdayStats.streak + 1
+                    if (latestDate != null && latestDate.plusDays(1) == todayDate) {
+                        latestStats.streak + 1
+                    } else {
+                        1
+                    }
                 } else {
                     1
                 }
@@ -402,10 +412,6 @@ class StudyRepository @Inject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "updateDailyStats failed", e)
         }
-    }
-
-    private fun getYesterdayDate(): String {
-        return LocalDate.now().minusDays(1).format(dateFormatter)
     }
 
     /**

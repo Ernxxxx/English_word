@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.example.englishword.data.local.entity.StudyRecord
 import kotlinx.coroutines.flow.Flow
 
@@ -49,6 +50,41 @@ interface StudyRecordDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(records: List<StudyRecord>): List<Long>
+
+    @Query("""
+        UPDATE words
+        SET masteryLevel = :masteryLevel,
+            nextReviewAt = :nextReviewAt,
+            reviewCount = reviewCount + 1,
+            updatedAt = :updatedAt
+        WHERE id = :wordId
+    """)
+    suspend fun updateWordMasteryForRecord(
+        wordId: Long,
+        masteryLevel: Int,
+        nextReviewAt: Long?,
+        updatedAt: Long = System.currentTimeMillis()
+    ): Int
+
+    @Transaction
+    suspend fun insertRecordAndUpdateMastery(
+        record: StudyRecord,
+        wordId: Long,
+        masteryLevel: Int,
+        nextReviewAt: Long?
+    ) {
+        insert(record)
+
+        val updatedRows = updateWordMasteryForRecord(
+            wordId = wordId,
+            masteryLevel = masteryLevel,
+            nextReviewAt = nextReviewAt
+        )
+
+        require(updatedRows == 1) {
+            "Word not found for mastery update: wordId=$wordId"
+        }
+    }
 
     @Delete
     suspend fun delete(record: StudyRecord)
