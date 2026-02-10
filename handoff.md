@@ -1,17 +1,16 @@
-# Handoff - English_word
+﻿# Handoff - English_word
 
-更新: 2026-02-09 20:22:13
+Updated: 2026-02-09 20:22:13
 
-## 今回やったこと
-- Phase 1 の致命バグ5件を実装で対応
-- `recordResult()` をトランザクション化（記録保存 + 単語習熟更新を同一トランザクションに統合）
-- `updateWordMastery()` の無言失敗を修正（単語未存在時は例外化して `recordResult()` を `false` 返却）
-- 連続学習日数計算を修正（`昨日固定` ではなく `最新記録日` 基準で 2日以上の空白を確実にリセット）
-- マスター済み単語が通常復習に再登場しないよう修正（レベル別復習クエリで `masteryLevel < 5` を適用）
-- `MIGRATION_7_8` の重複削除ロジックを修正（`masteryLevel` 優先、同値時は `id` 大を採用）
-- テスト更新: `StudyRepositoryTest.kt` を現行実装に合わせて再構成
+## What was done (Phase 1: Critical Bug Fixes - 5 items)
+- Wrapped `recordResult()` in a transaction (study record save + word mastery update in a single transaction)
+- Fixed silent failure in `updateWordMastery()` (throws exception when word not found; `recordResult()` returns `false`)
+- Fixed streak calculation (based on latest record date, not hardcoded "yesterday"; resets after 2+ day gap)
+- Prevented mastered words from appearing in normal review (added `masteryLevel < 5` filter to level-based review query)
+- Fixed duplicate deletion logic in `MIGRATION_7_8` (prioritize by `masteryLevel`, break ties by largest `id`)
+- Updated tests: restructured `StudyRepositoryTest.kt` to match current implementation
 
-変更ファイル:
+## Changed files
 - `app/src/main/java/com/example/englishword/data/local/dao/StudyRecordDao.kt`
 - `app/src/main/java/com/example/englishword/data/repository/StudyRepository.kt`
 - `app/src/main/java/com/example/englishword/data/local/dao/WordDao.kt`
@@ -19,23 +18,23 @@
 - `app/src/test/java/com/example/englishword/data/repository/StudyRepositoryTest.kt`
 - `handoff.md`
 
-## 現在の状態
-- ビルド: 未実行
-- テスト: `testDebugUnitTest`（対象: `StudyRepositoryTest`, `SrsCalculatorTest`）成功
-- 未コミットの変更: あり（上記ファイル変更 + 未追跡 `nul`）
+## Current state
+- Build: not yet run
+- Tests: `testDebugUnitTest` (targets: `StudyRepositoryTest`, `SrsCalculatorTest`) passed
+- Uncommitted changes: yes (above file changes + untracked `nul` file)
 
-## 残りのタスク
-- [ ] Phase 2: リリースブロッカー（広告ID本番化、署名設定、applicationId変更）
-- [ ] Phase 3: セキュリティ強化（端末時刻改ざん対策、バックアップ除外）
-- [ ] Phase 4: UX改善（英語文言の日本語化、統計エラー状態、二重タップ防止など）
-- [ ] Phase 5: コード品質（`MAX_LEVEL` ハードコード統一、`reorderLevels()` トランザクション化など）
+## Remaining tasks
+- [ ] Phase 2: Release blockers (production ad ID, signing config, applicationId change)
+- [ ] Phase 3: Security hardening (device clock tampering protection, backup exclusion)
+- [ ] Phase 4: UX improvements (localize English strings to Japanese, stats error states, double-tap prevention, etc.)
+- [ ] Phase 5: Code quality (`MAX_LEVEL` hardcode unification, `reorderLevels()` transaction wrapping, etc.)
 
-## 注意点
-- `WordDao.getWordsForReview()` は今回から `masteryLevel < 5` を条件に含むため、学習セッション対象は未習熟単語のみ
-- `InitialDataSeeder` は `getAllWordsForReview()` を使用しており、今回の変更対象外
-- ルートに `nul` という未追跡ファイルがあるため、後続作業時に誤操作へ注意
+## Important notes
+- `WordDao.getWordsForReview()` now includes `masteryLevel < 5` condition, so study sessions only target unmastered words
+- `InitialDataSeeder` uses `getAllWordsForReview()` and was NOT changed in this update
+- There is an untracked `nul` file at project root - be careful not to accidentally commit it
 
-## 関連ファイル
+## Related files
 - `app/src/main/java/com/example/englishword/data/local/dao/StudyRecordDao.kt`
 - `app/src/main/java/com/example/englishword/data/repository/StudyRepository.kt`
 - `app/src/main/java/com/example/englishword/data/local/dao/WordDao.kt`
