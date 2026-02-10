@@ -59,6 +59,7 @@ import com.example.englishword.ui.theme.MasteryLevel2
 import com.example.englishword.ui.theme.MasteryLevel3
 import com.example.englishword.ui.theme.MasteryLevel4
 import com.example.englishword.ui.theme.MasteryLevel5
+import com.example.englishword.util.SrsCalculator
 
 /**
  * Main study screen composable.
@@ -280,7 +281,7 @@ private fun LoadingContent() {
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Loading words...",
+                text = "単語を読み込み中...",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -402,14 +403,11 @@ private fun MasteryInfoRow(currentWord: Word) {
     ) {
         val masteryLevel = currentWord.masteryLevel
         val masteryColor = getMasteryColor(masteryLevel)
-        val masteryLabel = when (masteryLevel) {
-            0 -> "新規"
-            1 -> "1/5"
-            2 -> "2/5"
-            3 -> "3/5"
-            4 -> "4/5"
-            5 -> "完璧"
-            else -> "$masteryLevel/5"
+        val maxLevel = SrsCalculator.MAX_LEVEL
+        val masteryLabel = when {
+            masteryLevel <= 0 -> "新規"
+            masteryLevel >= maxLevel -> "完璧"
+            else -> "$masteryLevel/$maxLevel"
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -484,7 +482,7 @@ private fun ErrorContent(message: String) {
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "Error",
+                text = "エラー",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.error
             )
@@ -628,7 +626,7 @@ private fun getMasteryColor(level: Int): androidx.compose.ui.graphics.Color {
         2 -> MasteryLevel2
         3 -> MasteryLevel3
         4 -> MasteryLevel4
-        5 -> MasteryLevel5
+        in SrsCalculator.MAX_LEVEL..Int.MAX_VALUE -> MasteryLevel5
         else -> MasteryLevel1
     }
 }

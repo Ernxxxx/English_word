@@ -80,13 +80,13 @@ class StudyViewModel @Inject constructor(
                 if (!isPremium) {
                     val canReview = unlockRepository.canReviewMore(isPremium)
                     if (!canReview) {
-                        _uiState.value = StudyUiState.Error("Daily review limit reached. Upgrade to premium for unlimited reviews.")
+                        _uiState.value = StudyUiState.Error("本日の無料復習上限に達しました。プレミアムで無制限に学習できます。")
                         return@launch
                     }
 
                     val isUnlocked = unlockRepository.isUnitUnlocked(levelId, isPremium = false, isParentLevel = false)
                     if (!isUnlocked) {
-                        _uiState.value = StudyUiState.Error("This unit is locked. Watch an ad or upgrade to premium.")
+                        _uiState.value = StudyUiState.Error("このユニットはロックされています。広告視聴またはプレミアムで解除してください。")
                         return@launch
                     }
                 }
@@ -112,7 +112,7 @@ class StudyViewModel @Inject constructor(
                 // Start fresh session
                 startNewSession(levelId)
             } catch (e: Exception) {
-                _uiState.value = StudyUiState.Error("Failed to load words: ${e.message}")
+                _uiState.value = StudyUiState.Error("単語の読み込みに失敗しました: ${e.message}")
             }
         }
     }
@@ -176,7 +176,7 @@ class StudyViewModel @Inject constructor(
         val words = wordRepository.getWordsForReview(levelId, limit = 20)
 
         if (words.isEmpty()) {
-            _uiState.value = StudyUiState.Error("No words available for study")
+            _uiState.value = StudyUiState.Error("学習対象の単語がありません")
             return
         }
 
@@ -188,7 +188,7 @@ class StudyViewModel @Inject constructor(
         val sessionId = studyRepository.startSessionWithProgress(levelId, wordIds, isReversed)
 
         if (sessionId == -1L) {
-            _uiState.value = StudyUiState.Error("Failed to start study session")
+            _uiState.value = StudyUiState.Error("学習セッションの開始に失敗しました")
             return
         }
 

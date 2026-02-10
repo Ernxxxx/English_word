@@ -20,6 +20,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,6 +36,8 @@ import com.example.englishword.ui.theme.EnglishWordTheme
 import com.example.englishword.ui.theme.EvaluationAgain
 import com.example.englishword.ui.theme.EvaluationKnown
 import com.example.englishword.ui.theme.EvaluationLater
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Evaluation buttons component for rating word knowledge.
@@ -42,6 +49,19 @@ fun EvaluationButtons(
     enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val scope = rememberCoroutineScope()
+    var isTapLocked by remember { mutableStateOf(false) }
+
+    fun onEvaluateWithDebounce(result: EvaluationResult) {
+        if (!enabled || isTapLocked) return
+        isTapLocked = true
+        onEvaluate(result)
+        scope.launch {
+            delay(300)
+            isTapLocked = false
+        }
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -53,8 +73,8 @@ fun EvaluationButtons(
             text = "まだ",
             icon = Icons.Default.Close,
             backgroundColor = EvaluationAgain,
-            onClick = { onEvaluate(EvaluationResult.AGAIN) },
-            enabled = enabled,
+            onClick = { onEvaluateWithDebounce(EvaluationResult.AGAIN) },
+            enabled = enabled && !isTapLocked,
             modifier = Modifier.weight(1f)
         )
 
@@ -64,8 +84,8 @@ fun EvaluationButtons(
             text = "あとで",
             icon = Icons.Default.Refresh,
             backgroundColor = EvaluationLater,
-            onClick = { onEvaluate(EvaluationResult.LATER) },
-            enabled = enabled,
+            onClick = { onEvaluateWithDebounce(EvaluationResult.LATER) },
+            enabled = enabled && !isTapLocked,
             modifier = Modifier.weight(1f)
         )
 
@@ -75,8 +95,8 @@ fun EvaluationButtons(
             text = "覚えた",
             icon = Icons.Default.Check,
             backgroundColor = EvaluationKnown,
-            onClick = { onEvaluate(EvaluationResult.KNOWN) },
-            enabled = enabled,
+            onClick = { onEvaluateWithDebounce(EvaluationResult.KNOWN) },
+            enabled = enabled && !isTapLocked,
             modifier = Modifier.weight(1f)
         )
     }

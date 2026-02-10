@@ -29,11 +29,6 @@ import javax.inject.Singleton
 /**
  * AdManager handles all AdMob operations including SDK initialization,
  * banner ads, and interstitial ads.
- *
- * Uses test ad unit IDs for development:
- * - Banner: ca-app-pub-3940256099942544/6300978111
- * - Interstitial: ca-app-pub-3940256099942544/1033173712
- * - App ID: ca-app-pub-3940256099942544~3347511713
  */
 @Singleton
 class AdManager @Inject constructor(
@@ -44,24 +39,11 @@ class AdManager @Inject constructor(
     companion object {
         private const val TAG = "AdManager"
 
-        // Test Ad Unit IDs (used in debug builds)
-        private const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
-        private const val TEST_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
-        private const val TEST_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
-
-        // FIXME: Replace with real AdMob ad unit ID before release
-        private const val PRODUCTION_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
-        // FIXME: Replace with real AdMob ad unit ID before release
-        private const val PRODUCTION_INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
-        // FIXME: Replace with real AdMob ad unit ID before release
-        private const val PRODUCTION_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
-
         private const val TEST_AD_PREFIX = "3940256099942544"
 
-        // Auto-switch based on build type
-        val BANNER_AD_UNIT_ID = if (BuildConfig.DEBUG) TEST_BANNER_AD_UNIT_ID else PRODUCTION_BANNER_AD_UNIT_ID
-        val INTERSTITIAL_AD_UNIT_ID = if (BuildConfig.DEBUG) TEST_INTERSTITIAL_AD_UNIT_ID else PRODUCTION_INTERSTITIAL_AD_UNIT_ID
-        val REWARDED_AD_UNIT_ID = if (BuildConfig.DEBUG) TEST_REWARDED_AD_UNIT_ID else PRODUCTION_REWARDED_AD_UNIT_ID
+        val BANNER_AD_UNIT_ID = BuildConfig.ADMOB_BANNER_AD_UNIT_ID
+        val INTERSTITIAL_AD_UNIT_ID = BuildConfig.ADMOB_INTERSTITIAL_AD_UNIT_ID
+        val REWARDED_AD_UNIT_ID = BuildConfig.ADMOB_REWARDED_AD_UNIT_ID
 
         // Frequency cap for interstitial ads (show every Nth study completion)
         const val INTERSTITIAL_FREQUENCY_CAP = 3
@@ -135,14 +117,14 @@ class AdManager @Inject constructor(
 
         // Runtime safety check: warn if production build still uses test ad IDs
         if (!BuildConfig.DEBUG) {
-            if (PRODUCTION_BANNER_AD_UNIT_ID.contains(TEST_AD_PREFIX)) {
-                Log.e(TAG, "PRODUCTION_BANNER_AD_UNIT_ID still contains test prefix! Replace with real ad unit ID before release.")
+            if (BANNER_AD_UNIT_ID.contains(TEST_AD_PREFIX) || BANNER_AD_UNIT_ID.isBlank()) {
+                Log.e(TAG, "Invalid release banner ad unit ID. Check ADMOB_BANNER_AD_UNIT_ID_RELEASE.")
             }
-            if (PRODUCTION_INTERSTITIAL_AD_UNIT_ID.contains(TEST_AD_PREFIX)) {
-                Log.e(TAG, "PRODUCTION_INTERSTITIAL_AD_UNIT_ID still contains test prefix! Replace with real ad unit ID before release.")
+            if (INTERSTITIAL_AD_UNIT_ID.contains(TEST_AD_PREFIX) || INTERSTITIAL_AD_UNIT_ID.isBlank()) {
+                Log.e(TAG, "Invalid release interstitial ad unit ID. Check ADMOB_INTERSTITIAL_AD_UNIT_ID_RELEASE.")
             }
-            if (PRODUCTION_REWARDED_AD_UNIT_ID.contains(TEST_AD_PREFIX)) {
-                Log.e(TAG, "PRODUCTION_REWARDED_AD_UNIT_ID still contains test prefix! Replace with real ad unit ID before release.")
+            if (REWARDED_AD_UNIT_ID.contains(TEST_AD_PREFIX) || REWARDED_AD_UNIT_ID.isBlank()) {
+                Log.e(TAG, "Invalid release rewarded ad unit ID. Check ADMOB_REWARDED_AD_UNIT_ID_RELEASE.")
             }
         }
 

@@ -195,7 +195,7 @@ fun PremiumScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Premium") },
+                title = { Text("プレミアム") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
@@ -238,7 +238,7 @@ fun PremiumScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Premium",
+                text = "プレミアム",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold
             )

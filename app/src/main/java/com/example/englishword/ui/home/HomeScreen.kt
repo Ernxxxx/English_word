@@ -337,7 +337,7 @@ private fun StatsHeader(
             ) {
                 Column {
                     Text(
-                        text = "Today's Study",
+                        text = "今日の学習",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -356,7 +356,7 @@ private fun StatsHeader(
                             }
                         )
                         Text(
-                            text = " / $dailyGoal words",
+                            text = " / ${dailyGoal}語",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 4.dp)
@@ -387,7 +387,7 @@ private fun StatsHeader(
             if (todayStudiedCount >= dailyGoal) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Daily goal achieved! Great job!",
+                    text = "目標達成！この調子です",
                     style = MaterialTheme.typography.labelMedium,
                     color = CorrectGreen,
                     fontWeight = FontWeight.Medium
@@ -460,7 +460,7 @@ private fun ParentLevelCard(
             // Expand/Collapse indicator with rotation animation
             Icon(
                 imageVector = Icons.Default.KeyboardArrowRight,
-                contentDescription = if (parentWithChildren.isExpanded) "Collapse" else "Expand",
+                contentDescription = if (parentWithChildren.isExpanded) "折りたたむ" else "展開する",
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.rotate(rotationAngle)
             )
@@ -554,7 +554,7 @@ private fun ChildLevelCard(
             if (isLocked) {
                 Icon(
                     imageVector = Icons.Default.Lock,
-                    contentDescription = "Locked",
+                    contentDescription = "ロック中",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
@@ -655,13 +655,13 @@ private fun EmptyLevelsContent() {
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "No Levels Yet",
+                text = "レベルがありません",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Tap the + button to create your first vocabulary level",
+                text = "右下の追加ボタンから最初のレベルを作成してください",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -694,7 +694,7 @@ private fun ErrorContent(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Oops!",
+            text = "エラーが発生しました",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
@@ -707,7 +707,7 @@ private fun ErrorContent(
         )
         Spacer(modifier = Modifier.height(24.dp))
         TextButton(onClick = onRetry) {
-            Text("Retry")
+            Text("再試行")
         }
     }
 }
@@ -719,11 +719,13 @@ private fun DeleteLevelDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
+    var isDeleting by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Delete Level",
+                text = "レベルを削除",
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.error
             )
@@ -731,12 +733,12 @@ private fun DeleteLevelDialog(
         text = {
             Column {
                 Text(
-                    text = "Are you sure you want to delete \"$levelName\"?"
+                    text = "「$levelName」を削除しますか？"
                 )
                 if (wordCount > 0) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "This will also delete $wordCount word${if (wordCount > 1) "s" else ""}.",
+                        text = "この操作で単語${wordCount}語も削除されます。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -745,17 +747,23 @@ private fun DeleteLevelDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = onConfirm
+                onClick = {
+                    if (!isDeleting) {
+                        isDeleting = true
+                        onConfirm()
+                    }
+                },
+                enabled = !isDeleting
             ) {
                 Text(
-                    text = "Delete",
+                    text = "削除する",
                     color = MaterialTheme.colorScheme.error
                 )
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("キャンセル")
             }
         }
     )
@@ -767,6 +775,8 @@ private fun UnlockUnitDialog(
     onWatchAd: () -> Unit,
     onPremiumClick: () -> Unit
 ) {
+    var isRequestingAd by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -819,7 +829,15 @@ private fun UnlockUnitDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onWatchAd) {
+            TextButton(
+                onClick = {
+                    if (!isRequestingAd) {
+                        isRequestingAd = true
+                        onWatchAd()
+                    }
+                },
+                enabled = !isRequestingAd
+            ) {
                 Icon(
                     imageVector = Icons.Default.PlayArrow,
                     contentDescription = "広告を見る",

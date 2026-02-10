@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.englishword.data.local.dao.WordDao
 import com.example.englishword.data.repository.StudyRepository
 import com.example.englishword.data.repository.WordRepository
+import com.example.englishword.util.SrsCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,6 +65,7 @@ data class StatsUiState(
     val averageDaily: Float = 0f,
     val masteryDistribution: List<MasteryLevel> = emptyList(),
     val isLoading: Boolean = true,
+    val error: String? = null,
     val showMasteredWordsDialog: Boolean = false,
     val showTodayWordsDialog: Boolean = false,
     val showSrsExplanation: Boolean = false,
@@ -116,7 +118,7 @@ class StatsViewModel @Inject constructor(
      */
     private fun loadStats() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
                 // Load one-shot data in parallel via suspend calls
@@ -165,14 +167,20 @@ class StatsViewModel @Inject constructor(
                         totalWords = totalWords,
                         averageDaily = averageDaily,
                         masteryDistribution = masteryDistribution,
-                        isLoading = false
+                        isLoading = false,
+                        error = null
                     )
                 }.collect { state ->
                     _uiState.value = state
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "loadStats failed", e)
-                _uiState.update { it.copy(isLoading = false) }
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "統計データの読み込みに失敗しました"
+                    )
+                }
             }
         }
     }
@@ -185,7 +193,7 @@ class StatsViewModel @Inject constructor(
         val rawDistribution = wordRepository.getMasteryDistribution()
         val countMap = rawDistribution.associate { it.masteryLevel to it.count }
 
-        return (0..5).map { level ->
+        return (0..SrsCalculator.MAX_LEVEL).map { level ->
             MasteryLevel(
                 level = level,
                 count = countMap[level] ?: 0,
@@ -227,7 +235,7 @@ class StatsViewModel @Inject constructor(
 
     fun showMasteredWordsDialog() {
         viewModelScope.launch {
-            val words = wordDao.getMasteredWordsListSync().map {
+            val words = wordDao.getMasteredWordsListSync(SrsCalculator.MAX_LEVEL).map {
                 WordSummary(english = it.english, japanese = it.japanese, masteryLevel = it.masteryLevel)
             }
             _uiState.update { it.copy(showMasteredWordsDialog = true, masteredWordsList = words) }

@@ -1,5 +1,7 @@
 package com.example.englishword.data.repository
 
+import androidx.room.withTransaction
+import com.example.englishword.data.local.AppDatabase
 import com.example.englishword.data.local.dao.LevelDao
 import com.example.englishword.data.local.dao.WordDao
 import com.example.englishword.data.local.entity.Level
@@ -15,6 +17,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class LevelRepository @Inject constructor(
+    private val database: AppDatabase,
     private val levelDao: LevelDao,
     private val wordDao: WordDao
 ) {
@@ -192,10 +195,12 @@ class LevelRepository @Inject constructor(
      */
     suspend fun reorderLevels(levelIds: List<Long>): Boolean {
         return try {
-            levelIds.forEachIndexed { index, levelId ->
-                val level = levelDao.getLevelByIdSync(levelId)
-                level?.let {
-                    levelDao.update(it.copy(orderIndex = index))
+            database.withTransaction {
+                levelIds.forEachIndexed { index, levelId ->
+                    val level = levelDao.getLevelByIdSync(levelId)
+                    level?.let {
+                        levelDao.update(it.copy(orderIndex = index))
+                    }
                 }
             }
             true

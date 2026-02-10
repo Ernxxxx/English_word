@@ -124,7 +124,7 @@ class WordRepository @Inject constructor(
      */
     suspend fun getLevelWordStats(): Map<Long, LevelWordStats> {
         return try {
-            wordDao.getLevelWordStats().associateBy { it.levelId }
+            wordDao.getLevelWordStats(SrsCalculator.MAX_LEVEL).associateBy { it.levelId }
         } catch (e: Exception) {
             Log.e(TAG, "getLevelWordStats failed", e)
             emptyMap()
@@ -159,7 +159,7 @@ class WordRepository @Inject constructor(
      * Get total mastered word count.
      */
     fun getTotalMasteredCount(): Flow<Int> {
-        return wordDao.getTotalMasteredCount()
+        return wordDao.getTotalMasteredCount(SrsCalculator.MAX_LEVEL)
             .catch { e ->
                 Log.e(TAG, "getTotalMasteredCount failed", e)
                 emit(0)
@@ -185,7 +185,7 @@ class WordRepository @Inject constructor(
      */
     suspend fun getTotalMasteredCountSync(): Int {
         return try {
-            wordDao.getTotalMasteredCountSync()
+            wordDao.getTotalMasteredCountSync(SrsCalculator.MAX_LEVEL)
         } catch (e: Exception) {
             Log.e(TAG, "getTotalMasteredCountSync failed", e)
             0
@@ -209,7 +209,7 @@ class WordRepository @Inject constructor(
      * Get mastered word count for a specific level.
      */
     fun getMasteredCountByLevel(levelId: Long): Flow<Int> {
-        return wordDao.getMasteredCountByLevel(levelId)
+        return wordDao.getMasteredCountByLevel(levelId, SrsCalculator.MAX_LEVEL)
             .catch { e ->
                 Log.e(TAG, "getMasteredCountByLevel failed", e)
                 emit(0)
@@ -225,7 +225,7 @@ class WordRepository @Inject constructor(
     suspend fun getWordsForReview(levelId: Long, limit: Int = 20): List<Word> {
         return try {
             val currentTime = System.currentTimeMillis()
-            wordDao.getWordsForReview(levelId, currentTime, limit)
+            wordDao.getWordsForReview(levelId, currentTime, SrsCalculator.MAX_LEVEL, limit)
         } catch (e: Exception) {
             Log.e(TAG, "getWordsForReview failed", e)
             emptyList()
@@ -260,7 +260,7 @@ class WordRepository @Inject constructor(
      * Get mastered words (masteryLevel = 5) for a specific level.
      */
     fun getMasteredWords(levelId: Long): Flow<List<Word>> {
-        return wordDao.getMasteredWords(levelId)
+        return wordDao.getMasteredWords(levelId, SrsCalculator.MAX_LEVEL)
             .catch { e ->
                 Log.e(TAG, "getMasteredWords failed", e)
                 emit(emptyList())
@@ -271,7 +271,7 @@ class WordRepository @Inject constructor(
      * Get unmastered words (masteryLevel < 5) for a specific level.
      */
     fun getUnmasteredWords(levelId: Long): Flow<List<Word>> {
-        return wordDao.getUnmasteredWords(levelId)
+        return wordDao.getUnmasteredWords(levelId, SrsCalculator.MAX_LEVEL)
             .catch { e ->
                 Log.e(TAG, "getUnmasteredWords failed", e)
                 emit(emptyList())

@@ -71,7 +71,7 @@ class HomeViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
-                                error = e.message ?: "Failed to load data"
+                                error = e.message ?: "データの読み込みに失敗しました"
                             )
                         }
                     }
@@ -111,7 +111,7 @@ class HomeViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = e.message ?: "Failed to load data"
+                        error = e.message ?: "データの読み込みに失敗しました"
                     )
                 }
             }
@@ -241,10 +241,10 @@ class HomeViewModel @Inject constructor(
                     hideDeleteDialog()
                     // Data will be refreshed automatically through Flow
                 } else {
-                    _events.emit(HomeEvent.ShowError("Failed to delete level"))
+                    _events.emit(HomeEvent.ShowError("レベルの削除に失敗しました"))
                 }
             } catch (e: Exception) {
-                _events.emit(HomeEvent.ShowError(e.message ?: "Failed to delete level"))
+                _events.emit(HomeEvent.ShowError(e.message ?: "レベルの削除に失敗しました"))
             }
         }
     }
@@ -328,7 +328,7 @@ class HomeViewModel @Inject constructor(
                 // Refresh data to update UI
                 loadData()
             } catch (e: Exception) {
-                _events.emit(HomeEvent.ShowError("Failed to unlock unit: ${e.message}"))
+                _events.emit(HomeEvent.ShowError("ユニット解除に失敗しました: ${e.message}"))
             }
         }
     }
@@ -385,7 +385,7 @@ class HomeViewModel @Inject constructor(
                 // Refresh data to update UI
                 loadData()
             } catch (e: Exception) {
-                _events.emit(HomeEvent.ShowError("Failed to unlock unit: ${e.message}"))
+                _events.emit(HomeEvent.ShowError("ユニット解除に失敗しました: ${e.message}"))
             }
         }
     }

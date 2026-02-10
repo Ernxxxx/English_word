@@ -165,13 +165,54 @@ fun StatsScreen(
             enter = fadeIn(),
             exit = fadeOut()
         ) {
-            StatsContent(
-                uiState = uiState,
-                onMasteredCardClick = { viewModel.showMasteredWordsDialog() },
-                onTodayCardClick = { viewModel.showTodayWordsDialog() },
-                onSrsHelpClick = { viewModel.showSrsExplanation() },
-                modifier = Modifier.padding(paddingValues)
+            if (uiState.error != null) {
+                StatsErrorContent(
+                    error = uiState.error.orEmpty(),
+                    onRetry = { viewModel.refresh() },
+                    modifier = Modifier.padding(paddingValues)
+                )
+            } else {
+                StatsContent(
+                    uiState = uiState,
+                    onMasteredCardClick = { viewModel.showMasteredWordsDialog() },
+                    onTodayCardClick = { viewModel.showTodayWordsDialog() },
+                    onSrsHelpClick = { viewModel.showSrsExplanation() },
+                    modifier = Modifier.padding(paddingValues)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsErrorContent(
+    error: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "統計データの読み込みに失敗しました",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
             )
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TextButton(onClick = onRetry) {
+                Text("再試行")
+            }
         }
     }
 }

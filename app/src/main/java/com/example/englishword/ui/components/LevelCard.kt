@@ -167,7 +167,7 @@ fun LevelCard(
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(
                                 imageVector = Icons.Filled.CheckCircle,
-                                contentDescription = "Completed",
+                                contentDescription = "完了",
                                 tint = CorrectGreen,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -197,7 +197,7 @@ fun LevelCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
-                            contentDescription = "More options",
+                            contentDescription = "その他の操作",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -207,7 +207,7 @@ fun LevelCard(
                         onDismissRequest = { showMenu = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Word List") },
+                            text = { Text("単語一覧") },
                             onClick = {
                                 showMenu = false
                                 onWordListClick()
@@ -222,7 +222,7 @@ fun LevelCard(
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    text = "Delete",
+                                    text = "削除",
                                     color = MaterialTheme.colorScheme.error
                                 )
                             },

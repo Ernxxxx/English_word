@@ -8,8 +8,9 @@ import com.example.englishword.data.local.entity.UnitUnlock
 import com.example.englishword.data.local.entity.UserSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import java.time.LocalDate
+import java.time.Instant
 import java.time.format.DateTimeFormatter
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,6 +26,7 @@ class UnlockRepository @Inject constructor(
 
         private const val KEY_TODAY_REVIEW_COUNT = "today_review_count"
         private const val KEY_REVIEW_COUNT_DATE = "review_count_date"
+        private const val KEY_LAST_TRUSTED_TIME_MS = "last_trusted_time_ms"
     }
 
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
@@ -45,7 +47,8 @@ class UnlockRepository @Inject constructor(
 
         // Check unlock status for child levels
         val unlock = unitUnlockDao.getUnlock(levelId)
-        return unlock?.isUnlocked() == true
+        val trustedNow = getTrustedNowMillis()
+        return unlock != null && unlock.unlockUntil > trustedNow
     }
 
     /**
@@ -68,7 +71,7 @@ class UnlockRepository @Inject constructor(
      * Unlock a unit for 3 hours after watching an ad.
      */
     suspend fun unlockUnitWithAd(levelId: Long) {
-        val unlockUntil = System.currentTimeMillis() + (UNLOCK_DURATION_HOURS * 60 * 60 * 1000)
+        val unlockUntil = getTrustedNowMillis() + (UNLOCK_DURATION_HOURS * 60 * 60 * 1000)
         val unlock = UnitUnlock(
             levelId = levelId,
             unlockUntil = unlockUntil
@@ -81,7 +84,7 @@ class UnlockRepository @Inject constructor(
      */
     suspend fun getRemainingUnlockTime(levelId: Long): Long {
         val unlock = unitUnlockDao.getUnlock(levelId) ?: return 0
-        val remaining = unlock.unlockUntil - System.currentTimeMillis()
+        val remaining = unlock.unlockUntil - getTrustedNowMillis()
         return if (remaining > 0) remaining else 0
     }
 
@@ -91,7 +94,7 @@ class UnlockRepository @Inject constructor(
      * This avoids N+1 queries when checking unlock status for multiple levels.
      */
     suspend fun getUnlockedLevelIds(): Set<Long> {
-        val now = System.currentTimeMillis()
+        val now = getTrustedNowMillis()
         return unitUnlockDao.getActiveUnlocks(now)
             .map { it.levelId }
             .toSet()
@@ -103,7 +106,7 @@ class UnlockRepository @Inject constructor(
      * Only includes levels that are currently unlocked.
      */
     suspend fun getRemainingUnlockTimes(): Map<Long, Long> {
-        val now = System.currentTimeMillis()
+        val now = getTrustedNowMillis()
         return unitUnlockDao.getActiveUnlocks(now)
             .associate { unlock ->
                 val remaining = unlock.unlockUntil - now
@@ -119,7 +122,7 @@ class UnlockRepository @Inject constructor(
      */
     suspend fun getTodayReviewCount(): Int {
         return database.withTransaction {
-            val today = LocalDate.now().format(dateFormatter)
+            val today = toDateString(getTrustedNowMillisInternal())
             val savedDate = userSettingsDao.getValue(KEY_REVIEW_COUNT_DATE)
 
             // Reset count if it's a new day
@@ -156,7 +159,7 @@ class UnlockRepository @Inject constructor(
      */
     suspend fun incrementReviewCount() {
         database.withTransaction {
-            val today = LocalDate.now().format(dateFormatter)
+            val today = toDateString(getTrustedNowMillisInternal())
             val savedDate = userSettingsDao.getValue(KEY_REVIEW_COUNT_DATE)
 
             if (savedDate != today) {
@@ -177,5 +180,28 @@ class UnlockRepository @Inject constructor(
         return userSettingsDao.getValueFlow(KEY_TODAY_REVIEW_COUNT).map { value ->
             value?.toIntOrNull() ?: 0
         }
+    }
+
+    private suspend fun getTrustedNowMillis(): Long {
+        return database.withTransaction {
+            getTrustedNowMillisInternal()
+        }
+    }
+
+    private suspend fun getTrustedNowMillisInternal(): Long {
+        val now = System.currentTimeMillis()
+        val lastTrusted = userSettingsDao.getValue(KEY_LAST_TRUSTED_TIME_MS)?.toLongOrNull() ?: now
+        val trustedNow = maxOf(now, lastTrusted)
+        if (trustedNow != lastTrusted) {
+            userSettingsDao.insert(UserSettings(KEY_LAST_TRUSTED_TIME_MS, trustedNow.toString()))
+        }
+        return trustedNow
+    }
+
+    private fun toDateString(epochMillis: Long): String {
+        val date = Instant.ofEpochMilli(epochMillis)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+        return date.format(dateFormatter)
     }
 }

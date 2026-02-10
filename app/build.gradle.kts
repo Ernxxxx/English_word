@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.gradle.api.GradleException
 
 plugins {
     alias(libs.plugins.android.application)
@@ -12,9 +13,40 @@ android {
     namespace = "com.example.englishword"
     compileSdk = 34
 
+    val isReleaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
+        taskName.contains("release", ignoreCase = true) || taskName.contains("bundle", ignoreCase = true)
+    }
+    val releaseApplicationId = ((project.findProperty("RELEASE_APPLICATION_ID") as String?)?.trim())
+        ?.takeIf { it.isNotEmpty() }
+        ?: "com.longs.englishword"
+
+    val releaseAdmobAppId = ((project.findProperty("ADMOB_APP_ID_RELEASE") as String?)?.trim()).orEmpty()
+    val releaseBannerAdUnitId = ((project.findProperty("ADMOB_BANNER_AD_UNIT_ID_RELEASE") as String?)?.trim()).orEmpty()
+    val releaseInterstitialAdUnitId = ((project.findProperty("ADMOB_INTERSTITIAL_AD_UNIT_ID_RELEASE") as String?)?.trim()).orEmpty()
+    val releaseRewardedAdUnitId = ((project.findProperty("ADMOB_REWARDED_AD_UNIT_ID_RELEASE") as String?)?.trim()).orEmpty()
+    val admobTestPrefix = "3940256099942544"
+
+    if (isReleaseTaskRequested) {
+        if (releaseAdmobAppId.isBlank() || releaseAdmobAppId.contains(admobTestPrefix)) {
+            throw GradleException("Release build requires a valid ADMOB_APP_ID_RELEASE (test ID is not allowed).")
+        }
+        if (releaseBannerAdUnitId.isBlank() || releaseBannerAdUnitId.contains(admobTestPrefix)) {
+            throw GradleException("Release build requires a valid ADMOB_BANNER_AD_UNIT_ID_RELEASE (test ID is not allowed).")
+        }
+        if (releaseInterstitialAdUnitId.isBlank() || releaseInterstitialAdUnitId.contains(admobTestPrefix)) {
+            throw GradleException("Release build requires a valid ADMOB_INTERSTITIAL_AD_UNIT_ID_RELEASE (test ID is not allowed).")
+        }
+        if (releaseRewardedAdUnitId.isBlank() || releaseRewardedAdUnitId.contains(admobTestPrefix)) {
+            throw GradleException("Release build requires a valid ADMOB_REWARDED_AD_UNIT_ID_RELEASE (test ID is not allowed).")
+        }
+    }
+
     signingConfigs {
         create("release") {
             val keystorePropertiesFile = rootProject.file("keystore.properties")
+            if (isReleaseTaskRequested && !keystorePropertiesFile.exists()) {
+                throw GradleException("Release build requires keystore.properties in project root.")
+            }
             if (keystorePropertiesFile.exists()) {
                 val keystoreProperties = Properties()
                 keystoreProperties.load(keystorePropertiesFile.inputStream())
@@ -27,7 +59,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.englishword"
+        applicationId = releaseApplicationId
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -43,6 +75,10 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            manifestPlaceholders["admobAppId"] = releaseAdmobAppId
+            buildConfigField("String", "ADMOB_BANNER_AD_UNIT_ID", "\"$releaseBannerAdUnitId\"")
+            buildConfigField("String", "ADMOB_INTERSTITIAL_AD_UNIT_ID", "\"$releaseInterstitialAdUnitId\"")
+            buildConfigField("String", "ADMOB_REWARDED_AD_UNIT_ID", "\"$releaseRewardedAdUnitId\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -53,6 +89,10 @@ android {
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
+            buildConfigField("String", "ADMOB_BANNER_AD_UNIT_ID", "\"ca-app-pub-3940256099942544/6300978111\"")
+            buildConfigField("String", "ADMOB_INTERSTITIAL_AD_UNIT_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
+            buildConfigField("String", "ADMOB_REWARDED_AD_UNIT_ID", "\"ca-app-pub-3940256099942544/5224354917\"")
         }
     }
 

@@ -284,7 +284,7 @@ private fun CelebrationHeader() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Congratulations!",
+            text = "お疲れさまでした！",
             fontSize = 64.sp,
             modifier = Modifier.graphicsLayer {
                 scaleX = scale.value
@@ -293,7 +293,7 @@ private fun CelebrationHeader() {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Study Complete!",
+            text = "学習完了！",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
@@ -326,7 +326,7 @@ private fun StatsCard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Today's Study",
+                text = "今日の学習",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -334,7 +334,7 @@ private fun StatsCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "$totalCount words",
+                text = "${totalCount}語",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -348,19 +348,19 @@ private fun StatsCard(
             ) {
                 StatItem(
                     icon = Icons.Default.Check,
-                    label = "Memorized",
+                    label = "覚えた",
                     count = knownCount,
                     color = CorrectGreen
                 )
                 StatItem(
                     icon = Icons.Default.Close,
-                    label = "Need Practice",
+                    label = "要復習",
                     count = againCount,
                     color = IncorrectRed
                 )
                 StatItem(
                     icon = Icons.Default.Refresh,
-                    label = "Later",
+                    label = "あとで",
                     count = laterCount,
                     color = StreakOrange
                 )
@@ -432,12 +432,12 @@ private fun StreakDisplay(streak: Int) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Streak",
+                text = "連続記録",
                 fontSize = 32.sp
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "$streak days streak!",
+                text = "${streak}日継続中！",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = StreakOrange
@@ -454,13 +454,21 @@ private fun ActionButtons(
     onNavigateToHome: () -> Unit,
     onRetry: () -> Unit
 ) {
+    var actionLocked by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Button(
-            onClick = onNavigateToHome,
+            onClick = {
+                if (!actionLocked) {
+                    actionLocked = true
+                    onNavigateToHome()
+                }
+            },
+            enabled = !actionLocked,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -476,13 +484,19 @@ private fun ActionButtons(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Return Home",
+                text = "ホームに戻る",
                 style = MaterialTheme.typography.titleMedium
             )
         }
 
         OutlinedButton(
-            onClick = onRetry,
+            onClick = {
+                if (!actionLocked) {
+                    actionLocked = true
+                    onRetry()
+                }
+            },
+            enabled = !actionLocked,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -495,7 +509,7 @@ private fun ActionButtons(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Study Again",
+                text = "もう一度学習",
                 style = MaterialTheme.typography.titleMedium
             )
         }

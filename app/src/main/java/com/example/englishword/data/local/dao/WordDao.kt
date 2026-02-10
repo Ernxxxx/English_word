@@ -33,12 +33,12 @@ interface WordDao {
     @Query("""
         SELECT levelId,
                COUNT(*) as wordCount,
-               SUM(CASE WHEN masteryLevel >= 5 THEN 1 ELSE 0 END) as masteredCount,
-               SUM(CASE WHEN masteryLevel >= 1 AND masteryLevel < 5 THEN 1 ELSE 0 END) as inProgressCount
+               SUM(CASE WHEN masteryLevel >= :maxMasteryLevel THEN 1 ELSE 0 END) as masteredCount,
+               SUM(CASE WHEN masteryLevel >= 1 AND masteryLevel < :maxMasteryLevel THEN 1 ELSE 0 END) as inProgressCount
         FROM words
         GROUP BY levelId
     """)
-    suspend fun getLevelWordStats(): List<LevelWordStats>
+    suspend fun getLevelWordStats(maxMasteryLevel: Int): List<LevelWordStats>
 
     @Query("SELECT * FROM words ORDER BY createdAt DESC")
     fun getAllWords(): Flow<List<Word>>
@@ -66,14 +66,19 @@ interface WordDao {
     @Query("""
         SELECT * FROM words
         WHERE levelId = :levelId
-        AND masteryLevel < 5
+        AND masteryLevel < :maxMasteryLevel
         AND (nextReviewAt IS NULL OR nextReviewAt <= :currentTime)
         ORDER BY
             CASE WHEN nextReviewAt IS NULL THEN 0 ELSE 1 END,
             nextReviewAt ASC
         LIMIT :limit
     """)
-    suspend fun getWordsForReview(levelId: Long, currentTime: Long, limit: Int = 20): List<Word>
+    suspend fun getWordsForReview(
+        levelId: Long,
+        currentTime: Long,
+        maxMasteryLevel: Int,
+        limit: Int = 20
+    ): List<Word>
 
     // Get all words due for review across all levels
     @Query("""
@@ -90,13 +95,13 @@ interface WordDao {
     @Query("SELECT * FROM words WHERE levelId = :levelId AND masteryLevel = :masteryLevel")
     fun getWordsByMasteryLevel(levelId: Long, masteryLevel: Int): Flow<List<Word>>
 
-    // Get mastered words (masteryLevel = 5)
-    @Query("SELECT * FROM words WHERE levelId = :levelId AND masteryLevel = 5")
-    fun getMasteredWords(levelId: Long): Flow<List<Word>>
+    // Get mastered words (masteryLevel >= maxMasteryLevel)
+    @Query("SELECT * FROM words WHERE levelId = :levelId AND masteryLevel >= :maxMasteryLevel")
+    fun getMasteredWords(levelId: Long, maxMasteryLevel: Int): Flow<List<Word>>
 
-    // Get unmastered words (masteryLevel < 5)
-    @Query("SELECT * FROM words WHERE levelId = :levelId AND masteryLevel < 5")
-    fun getUnmasteredWords(levelId: Long): Flow<List<Word>>
+    // Get unmastered words (masteryLevel < maxMasteryLevel)
+    @Query("SELECT * FROM words WHERE levelId = :levelId AND masteryLevel < :maxMasteryLevel")
+    fun getUnmasteredWords(levelId: Long, maxMasteryLevel: Int): Flow<List<Word>>
 
     // Search words
     @Query("""
@@ -135,26 +140,26 @@ interface WordDao {
     @Query("SELECT COUNT(*) FROM words WHERE levelId = :levelId")
     fun getWordCountByLevel(levelId: Long): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM words WHERE levelId = :levelId AND masteryLevel = 5")
-    fun getMasteredCountByLevel(levelId: Long): Flow<Int>
+    @Query("SELECT COUNT(*) FROM words WHERE levelId = :levelId AND masteryLevel >= :maxMasteryLevel")
+    fun getMasteredCountByLevel(levelId: Long, maxMasteryLevel: Int): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM words WHERE masteryLevel = 5")
-    fun getTotalMasteredCount(): Flow<Int>
+    @Query("SELECT COUNT(*) FROM words WHERE masteryLevel >= :maxMasteryLevel")
+    fun getTotalMasteredCount(maxMasteryLevel: Int): Flow<Int>
 
     // Suspend count queries for statistics screen
     @Query("SELECT COUNT(*) FROM words")
     suspend fun getTotalWordCountSync(): Int
 
-    @Query("SELECT COUNT(*) FROM words WHERE masteryLevel >= 5")
-    suspend fun getTotalMasteredCountSync(): Int
+    @Query("SELECT COUNT(*) FROM words WHERE masteryLevel >= :maxMasteryLevel")
+    suspend fun getTotalMasteredCountSync(maxMasteryLevel: Int): Int
 
     // Mastery distribution for statistics screen
     @Query("SELECT masteryLevel, COUNT(*) as count FROM words GROUP BY masteryLevel ORDER BY masteryLevel ASC")
     suspend fun getMasteryDistribution(): List<MasteryCount>
 
     // Get all mastered words (for stats detail view)
-    @Query("SELECT * FROM words WHERE masteryLevel >= 5 ORDER BY updatedAt DESC")
-    suspend fun getMasteredWordsListSync(): List<Word>
+    @Query("SELECT * FROM words WHERE masteryLevel >= :maxMasteryLevel ORDER BY updatedAt DESC")
+    suspend fun getMasteredWordsListSync(maxMasteryLevel: Int): List<Word>
 
     // Get words studied today (from study records)
     @Query("""

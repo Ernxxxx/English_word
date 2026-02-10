@@ -94,7 +94,7 @@ fun StreakBadge(
             // Fire icon
             Icon(
                 imageVector = Icons.Filled.Whatshot,
-                contentDescription = "Streak",
+                contentDescription = "連続記録",
                 tint = if (isActive) StreakOrange else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier.size(size.emojiSize.value.dp)
             )
@@ -102,7 +102,7 @@ fun StreakBadge(
             // Streak count
             Text(
                 text = if (showLabel) {
-                    "$streak day${if (streak != 1) "s" else ""}"
+                    "連続 ${streak}日"
                 } else {
                     streak.toString()
                 },
@@ -158,7 +158,7 @@ fun StreakBadgeJapanese(
         ) {
             Icon(
                 imageVector = Icons.Filled.Whatshot,
-                contentDescription = "Streak",
+                contentDescription = "連続記録",
                 tint = if (isActive) StreakOrange else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier.size(18.dp)
             )
@@ -215,7 +215,7 @@ fun StreakDisplay(
         ) {
             Icon(
                 imageVector = Icons.Filled.Whatshot,
-                contentDescription = "Streak",
+                contentDescription = "連続記録",
                 tint = if (isActive) StreakOrange else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(28.dp)
             )
@@ -226,7 +226,7 @@ fun StreakDisplay(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = if (streak == 1) "day" else "days",
+                text = "日",
                 color = if (isActive) {
                     StreakOrange.copy(alpha = 0.8f)
                 } else {
