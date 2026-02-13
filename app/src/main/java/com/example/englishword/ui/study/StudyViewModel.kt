@@ -20,6 +20,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class StudyWordMode {
+    AUTO,
+    REVIEW_ONLY,
+    NEW_ONLY
+}
+
 /**
  * ViewModel for the Study screen.
  * Manages the study session, card flipping, word evaluation, and quiz mode.
@@ -53,6 +59,7 @@ class StudyViewModel @Inject constructor(
     // Quiz mode: cached words in current level for generating distractors
     private var allWordsInLevel: List<Word> = emptyList()
     private var isQuizMode: Boolean = false
+    private var studyWordMode: StudyWordMode = StudyWordMode.AUTO
 
     // Job tracking for quiz answer DB writes (prevents race condition with nextQuizWord)
     private var lastRecordJob: Job? = null
@@ -117,6 +124,10 @@ class StudyViewModel @Inject constructor(
         }
     }
 
+    fun setStudyWordMode(mode: StudyWordMode) {
+        studyWordMode = mode
+    }
+
     /**
      * Resume an incomplete session.
      */
@@ -173,10 +184,19 @@ class StudyViewModel @Inject constructor(
      * Start a new study session.
      */
     private suspend fun startNewSession(levelId: Long) {
-        val words = wordRepository.getWordsForReview(levelId, limit = 20)
+        val words = when (studyWordMode) {
+            StudyWordMode.AUTO -> wordRepository.getWordsForReview(levelId, limit = 20)
+            StudyWordMode.REVIEW_ONLY -> wordRepository.getDueWordsForReview(levelId, limit = 20)
+            StudyWordMode.NEW_ONLY -> wordRepository.getNewWordsForReview(levelId, limit = 20)
+        }
 
         if (words.isEmpty()) {
-            _uiState.value = StudyUiState.Error("学習対象の単語がありません")
+            val message = when (studyWordMode) {
+                StudyWordMode.AUTO -> "学習対象の単語がありません"
+                StudyWordMode.REVIEW_ONLY -> "復習対象の単語がありません"
+                StudyWordMode.NEW_ONLY -> "新規単語がありません"
+            }
+            _uiState.value = StudyUiState.Error(message)
             return
         }
 
@@ -308,10 +328,7 @@ class StudyViewModel @Inject constructor(
                     // メインリスト終了、laterQueueを新しいリストとして開始
                     laterQueueCycleCount++
                     if (laterQueueCycleCount > maxLaterQueueCycles) {
-                        viewModelScope.launch {
-                            studyRepository.recordResult(sessionId, currentWord.id, 1, responseTimeMs)
-                        }
-                        forceCompleteSession(sessionId)
+                        forceCompleteSession(sessionId, currentWord.id, 1, responseTimeMs)
                         return
                     }
                     val newState = currentState.copy(
@@ -364,10 +381,7 @@ class StudyViewModel @Inject constructor(
                     // メインリスト完了だがlaterQueueに単語が残っている
                     laterQueueCycleCount++
                     if (laterQueueCycleCount > maxLaterQueueCycles) {
-                        viewModelScope.launch {
-                            studyRepository.recordResult(sessionId, currentWord.id, 2, responseTimeMs)
-                        }
-                        forceCompleteSession(sessionId)
+                        forceCompleteSession(sessionId, currentWord.id, 2, responseTimeMs)
                         return
                     }
                     val newState = currentState.copy(
@@ -385,26 +399,8 @@ class StudyViewModel @Inject constructor(
                     }
                 } else {
                     // 全単語完了
-                    _uiState.value = StudyUiState.Completed(
-                        sessionId = sessionId,
-                        levelId = currentLevelId,
-                        totalCount = knownCount + againCount + laterCount,
-                        knownCount = knownCount,
-                        againCount = againCount,
-                        laterCount = laterCount,
-                        streak = 0
-                    )
-
-                    // Complete session (clears progress data)
-                    viewModelScope.launch {
-                        studyRepository.recordResult(sessionId, currentWord.id, 2, responseTimeMs)
-                        studyRepository.completeSession(sessionId, knownCount + againCount, knownCount)
-                        val streak = studyRepository.getCurrentStreak()
-                        val completedState = _uiState.value
-                        if (completedState is StudyUiState.Completed) {
-                            _uiState.value = completedState.copy(streak = streak)
-                        }
-                    }
+                    forceCompleteSession(sessionId, currentWord.id, 2, responseTimeMs)
+                    return
                 }
             }
         }
@@ -494,10 +490,7 @@ class StudyViewModel @Inject constructor(
         } else if (newLaterQueue.isNotEmpty()) {
             laterQueueCycleCount++
             if (laterQueueCycleCount > maxLaterQueueCycles) {
-                viewModelScope.launch {
-                    studyRepository.recordResult(currentState.sessionId, currentWord.id, 1, 0L)
-                }
-                forceCompleteSession(currentState.sessionId)
+                forceCompleteSession(currentState.sessionId, currentWord.id, 1, 0L)
                 return
             }
             val nextWord = newLaterQueue.first()
@@ -595,28 +588,8 @@ class StudyViewModel @Inject constructor(
                 }
             } else {
                 // All words completed
-                _uiState.value = StudyUiState.Completed(
-                    sessionId = currentState.sessionId,
-                    levelId = currentLevelId,
-                    totalCount = knownCount + againCount + laterCount,
-                    knownCount = knownCount,
-                    againCount = againCount,
-                    laterCount = laterCount,
-                    streak = 0
-                )
-
-                viewModelScope.launch {
-                    studyRepository.completeSession(
-                        currentState.sessionId,
-                        knownCount + againCount,
-                        knownCount
-                    )
-                    val streak = studyRepository.getCurrentStreak()
-                    val completedState = _uiState.value
-                    if (completedState is StudyUiState.Completed) {
-                        _uiState.value = completedState.copy(streak = streak)
-                    }
-                }
+                forceCompleteSession(currentState.sessionId)
+                return
             }
         } else {
             // Wrong: add to later queue and advance
@@ -678,26 +651,32 @@ class StudyViewModel @Inject constructor(
     }
 
     /**
-     * Force complete the session when laterQueue cycle limit is exceeded.
+     * Persist final session result and then emit completed state.
+     * This avoids losing completion updates when screen navigation disposes the ViewModel.
      */
-    private fun forceCompleteSession(sessionId: Long) {
-        _uiState.value = StudyUiState.Completed(
-            sessionId = sessionId,
-            levelId = currentLevelId,
-            totalCount = knownCount + againCount + laterCount,
-            knownCount = knownCount,
-            againCount = againCount,
-            laterCount = laterCount,
-            streak = 0
-        )
-
+    private fun forceCompleteSession(
+        sessionId: Long,
+        finalWordId: Long? = null,
+        finalResult: Int? = null,
+        responseTimeMs: Long = 0L
+    ) {
         viewModelScope.launch {
+            if (finalWordId != null && finalResult != null) {
+                studyRepository.recordResult(sessionId, finalWordId, finalResult, responseTimeMs)
+            }
+
             studyRepository.completeSession(sessionId, knownCount + againCount, knownCount)
             val streak = studyRepository.getCurrentStreak()
-            val completedState = _uiState.value
-            if (completedState is StudyUiState.Completed) {
-                _uiState.value = completedState.copy(streak = streak)
-            }
+
+            _uiState.value = StudyUiState.Completed(
+                sessionId = sessionId,
+                levelId = currentLevelId,
+                totalCount = knownCount + againCount + laterCount,
+                knownCount = knownCount,
+                againCount = againCount,
+                laterCount = laterCount,
+                streak = streak
+            )
         }
     }
 

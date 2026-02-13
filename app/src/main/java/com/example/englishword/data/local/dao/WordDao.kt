@@ -62,14 +62,14 @@ interface WordDao {
     @Query("SELECT * FROM words WHERE english = :english LIMIT 1")
     suspend fun getWordByEnglish(english: String): Word?
 
-    // Get unmastered words that are due for review (nextReviewAt <= current time or new words)
+    // Get unmastered words for study (due reviews first, then new words)
     @Query("""
         SELECT * FROM words
         WHERE levelId = :levelId
         AND masteryLevel < :maxMasteryLevel
         AND (nextReviewAt IS NULL OR nextReviewAt <= :currentTime)
         ORDER BY
-            CASE WHEN nextReviewAt IS NULL THEN 0 ELSE 1 END,
+            CASE WHEN nextReviewAt IS NULL THEN 1 ELSE 0 END,
             nextReviewAt ASC
         LIMIT :limit
     """)
@@ -80,12 +80,44 @@ interface WordDao {
         limit: Int = 20
     ): List<Word>
 
+    // Get only due review words (exclude new words)
+    @Query("""
+        SELECT * FROM words
+        WHERE levelId = :levelId
+        AND masteryLevel < :maxMasteryLevel
+        AND nextReviewAt IS NOT NULL
+        AND nextReviewAt <= :currentTime
+        ORDER BY nextReviewAt ASC
+        LIMIT :limit
+    """)
+    suspend fun getDueWordsForReview(
+        levelId: Long,
+        currentTime: Long,
+        maxMasteryLevel: Int,
+        limit: Int = 20
+    ): List<Word>
+
+    // Get only new words (never reviewed)
+    @Query("""
+        SELECT * FROM words
+        WHERE levelId = :levelId
+        AND masteryLevel < :maxMasteryLevel
+        AND nextReviewAt IS NULL
+        ORDER BY createdAt ASC
+        LIMIT :limit
+    """)
+    suspend fun getNewWordsForReview(
+        levelId: Long,
+        maxMasteryLevel: Int,
+        limit: Int = 20
+    ): List<Word>
+
     // Get all words due for review across all levels
     @Query("""
         SELECT * FROM words
         WHERE nextReviewAt IS NULL OR nextReviewAt <= :currentTime
         ORDER BY
-            CASE WHEN nextReviewAt IS NULL THEN 0 ELSE 1 END,
+            CASE WHEN nextReviewAt IS NULL THEN 1 ELSE 0 END,
             nextReviewAt ASC
         LIMIT :limit
     """)

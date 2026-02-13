@@ -77,6 +77,15 @@ fun StudyScreen(
     val isTtsReady by viewModel.ttsManager.isReady.collectAsStateWithLifecycle()
     val isTtsSpeaking by viewModel.ttsManager.isSpeaking.collectAsStateWithLifecycle()
     var showBackConfirmDialog by remember { mutableStateOf(false) }
+    var hasEnteredStudyInThisScreen by remember(levelId) { mutableStateOf(false) }
+    var showModeDialog by remember(levelId) { mutableStateOf(true) }
+
+    fun startStudy(mode: StudyWordMode) {
+        hasEnteredStudyInThisScreen = false
+        showModeDialog = false
+        viewModel.setStudyWordMode(mode)
+        viewModel.loadWords(levelId)
+    }
 
     // Back confirmation dialog during study
     BackHandler(enabled = uiState is StudyUiState.Studying) {
@@ -103,16 +112,53 @@ fun StudyScreen(
         )
     }
 
-    // Load words when screen is first displayed
-    LaunchedEffect(levelId) {
-        viewModel.loadWords(levelId)
+    if (showModeDialog) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("学習モードを選択") },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = { startStudy(StudyWordMode.AUTO) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("おまかせ（復習優先）")
+                    }
+                    Button(
+                        onClick = { startStudy(StudyWordMode.REVIEW_ONLY) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("復習のみ")
+                    }
+                    Button(
+                        onClick = { startStudy(StudyWordMode.NEW_ONLY) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("新規のみ")
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = onNavigateBack) {
+                    Text("戻る")
+                }
+            }
+        )
     }
 
-    // Navigate to result when completed
+    // Ignore stale Completed state from a previous session and navigate only after this screen entered Studying.
     LaunchedEffect(uiState) {
-        if (uiState is StudyUiState.Completed) {
-            val completedState = uiState as StudyUiState.Completed
-            onNavigateToResult(completedState.sessionId)
+        when (val state = uiState) {
+            is StudyUiState.Studying -> hasEnteredStudyInThisScreen = true
+            is StudyUiState.Completed -> {
+                if (hasEnteredStudyInThisScreen) {
+                    onNavigateToResult(state.sessionId)
+                }
+            }
+            else -> Unit
         }
     }
 

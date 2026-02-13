@@ -8,7 +8,9 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -22,6 +24,7 @@ import com.example.englishword.ui.settings.SettingsScreen
 import com.example.englishword.ui.stats.StatsScreen
 import com.example.englishword.ui.study.StudyResultScreen
 import com.example.englishword.ui.study.StudyScreen
+import com.example.englishword.ui.study.StudyViewModel
 import com.example.englishword.ui.word.WordEditScreen
 import com.example.englishword.ui.word.WordListScreen
 
@@ -131,6 +134,10 @@ fun EnglishWordNavHost(
             )
         ) { backStackEntry ->
             val levelId = backStackEntry.arguments?.getLong(NavArgs.LEVEL_ID) ?: 0L
+            val homeBackStackEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(Routes.HOME)
+            }
+            val studyViewModel: StudyViewModel = hiltViewModel(homeBackStackEntry)
             StudyScreen(
                 levelId = levelId,
                 onNavigateToResult = { sessionId ->
@@ -140,7 +147,8 @@ fun EnglishWordNavHost(
                 },
                 onNavigateBack = {
                     navController.popBackStack()
-                }
+                },
+                viewModel = studyViewModel
             )
         }
 
@@ -158,6 +166,10 @@ fun EnglishWordNavHost(
             )
         ) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getLong(NavArgs.SESSION_ID) ?: 0L
+            val homeBackStackEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(Routes.HOME)
+            }
+            val studyViewModel: StudyViewModel = hiltViewModel(homeBackStackEntry)
             StudyResultScreen(
                 sessionId = sessionId,
                 onNavigateToHome = {
@@ -173,7 +185,8 @@ fun EnglishWordNavHost(
                         popUpTo(Routes.HOME) { inclusive = false }
                         launchSingleTop = true
                     }
-                }
+                },
+                viewModel = studyViewModel
             )
         }
 

@@ -1,72 +1,42 @@
 ﻿# Handoff - English_word
 
-更新: 2026-02-10 19:33:53
+更新: 2026-02-13 14:10:00
 
 ## 今回やったこと
-- Phase 2 対応: リリース設定を強化
-- `app/build.gradle.kts` で `RELEASE_APPLICATION_ID` を導入し、`applicationId` を `com.longs.englishword`（デフォルト）へ変更
-- `app/build.gradle.kts` でリリース時の AdMob ID 必須化（`ADMOB_*_RELEASE` が空・テストIDならビルド失敗）
-- `app/build.gradle.kts` でリリース時の `keystore.properties` 必須化
-- `AndroidManifest.xml` の AdMob App ID を `${admobAppId}` プレースホルダ化
-- `AdManager.kt` を `BuildConfig.ADMOB_*` 参照へ変更（デバッグ/リリース自動切替）
-- `gradle.properties` に本番 AdMob ID を反映
-  - `ADMOB_APP_ID_RELEASE=ca-app-pub-8894698859594740~4740287093`
-  - `ADMOB_BANNER_AD_UNIT_ID_RELEASE=ca-app-pub-8894698859594740/3359030460`
-  - `ADMOB_INTERSTITIAL_AD_UNIT_ID_RELEASE=ca-app-pub-8894698859594740/3167458771`
-  - `ADMOB_REWARDED_AD_UNIT_ID_RELEASE=ca-app-pub-8894698859594740/4088814318`
-- Phase 3 対応: セキュリティ強化
-- `UnlockRepository.kt` に時刻改ざん耐性を追加（単調増加の trusted time を導入し、解除期限/日次上限判定に使用）
-- `AndroidManifest.xml` で `android:allowBackup="false"` に変更
-- `backup_rules.xml` / `data_extraction_rules.xml` で DB・SharedPreferences・files をバックアップ除外
-- Phase 4 対応: UX改善
-- `HomeScreen.kt` / `StudyScreen.kt` / `StudyResultScreen.kt` / `HomeViewModel.kt` / `StudyViewModel.kt` / `PremiumScreen.kt` の英語文言を日本語化
-- `StatsViewModel.kt` に `error` 状態を追加し、`StatsScreen.kt` にエラー表示＋再試行UIを追加
-- 二重タップ防止を追加
-- `EvaluationButtons.kt` に 300ms デバウンスを追加
-- `HomeScreen.kt` の削除確認/広告視聴ボタンに再タップ防止を追加
-- `StudyResultScreen.kt` の操作ボタンに再タップ防止を追加
-- Phase 5 対応: コード品質改善
-- `LevelRepository.reorderLevels()` を `database.withTransaction` でトランザクション化
-- `MAX_LEVEL` ハードコード統一
-- `WordDao.kt` の mastered 判定クエリを `maxMasteryLevel` 引数化
-- `WordRepository.kt` / `StatsViewModel.kt` / `StudyScreen.kt` で `SrsCalculator.MAX_LEVEL` を使用するよう統一
+- 残タスクの実機検証を実施（`Pixel_8a_API_34` エミュレータ + `adb`）
+- 学習開始時のモード選択ダイアログ表示を確認
+  - `おまかせ（復習優先）`
+  - `復習のみ`
+  - `新規のみ`
+- モード別出題の確認を実施
+  - `復習のみ`: 期限到来語のみ出題されることを確認（`新規` が混ざらない）
+  - `新規のみ`: 新規語ラベルで出題されることを確認
+  - `おまかせ`: 先に復習語が出題され、その後に新規語へ切り替わることを確認
+- 20問完了後の結果画面で `もう一度学習` を押し、無限ループせずモード選択へ戻ることを確認
+- 検証のためにエミュレータ内 DB を一時調整（期限到来語/新規語の混在状態を作成）し、未完了セッションを削除して再現条件を固定
 
 ## 現在の状態
-- ビルド: `./gradlew :app:assembleRelease -x test` 成功
-- テスト: `./gradlew testDebugUnitTest` 成功
-- 未コミットの変更: あり（今回の実装ファイル一式 + 未追跡 `nul`）
+- ビルド: 今回は未実行（前回 handoff で `:app:assembleDebug` 成功）
+- テスト: 今回は未実行（前回 handoff で `:app:testDebugUnitTest` 成功）
+- 実機/エミュレータ確認:
+  - `./gradlew :app:installDebug --no-daemon` 実行（終了コード 0）
+  - `com.longs.englishword.debug` 起動・画面遷移・モード別出題を確認
+- 未コミットの変更: あり（`WordDao.kt`, `WordRepository.kt`, `NavGraph.kt`, `StudyResultScreen.kt`, `StudyScreen.kt`, `StudyViewModel.kt`, `handoff.md`）+ 未追跡 `nul`
 
 ## 残りのタスク
-- [ ] 変更をレビューしてコミット
-- [ ] 必要なら `RELEASE_APPLICATION_ID` を最終値へ調整
-- [ ] Play Console / AdMob 連携の最終確認
+- [ ] なし（本件の残タスクは完了）
 
 ## 注意点
-- リリースタスク実行時は AdMob 本番ID未設定だと意図的にビルド失敗する仕様
-- リリースタスク実行時は `keystore.properties` が無いと意図的にビルド失敗する仕様
-- `UnlockRepository` は trusted time を `user_settings` に保持するため、端末時刻を巻き戻しても解除期限/日次上限が後退しない
-- ルートに `nul` の未追跡ファイルがあるため、後続作業時に誤操作へ注意
+- `Study` / `StudyResult` は HOME スコープの `StudyViewModel` を共有
+- `adb` が PATH にない環境では `C:\Users\longs\AppData\Local\Android\Sdk\platform-tools\adb.exe` を明示指定
+- ルートに未追跡ファイル `nul` があるため、コミット時に誤って追加しない
+- 検証時にエミュレータ内 DB 状態を調整しているため、同条件を再現する場合は同様にデータ状態を揃える
 
 ## 関連ファイル
-- `app/build.gradle.kts`
-- `app/src/main/AndroidManifest.xml`
-- `app/src/main/java/com/example/englishword/ads/AdManager.kt`
-- `app/src/main/java/com/example/englishword/data/repository/UnlockRepository.kt`
-- `app/src/main/java/com/example/englishword/data/repository/LevelRepository.kt`
-- `app/src/main/java/com/example/englishword/data/local/dao/WordDao.kt`
-- `app/src/main/java/com/example/englishword/data/repository/WordRepository.kt`
-- `app/src/main/java/com/example/englishword/ui/stats/StatsViewModel.kt`
-- `app/src/main/java/com/example/englishword/ui/stats/StatsScreen.kt`
-- `app/src/main/java/com/example/englishword/ui/components/EvaluationButtons.kt`
-- `app/src/main/java/com/example/englishword/ui/home/HomeScreen.kt`
-- `app/src/main/java/com/example/englishword/ui/home/HomeViewModel.kt`
 - `app/src/main/java/com/example/englishword/ui/study/StudyScreen.kt`
 - `app/src/main/java/com/example/englishword/ui/study/StudyViewModel.kt`
+- `app/src/main/java/com/example/englishword/data/repository/WordRepository.kt`
+- `app/src/main/java/com/example/englishword/data/local/dao/WordDao.kt`
+- `app/src/main/java/com/example/englishword/ui/navigation/NavGraph.kt`
 - `app/src/main/java/com/example/englishword/ui/study/StudyResultScreen.kt`
-- `app/src/main/java/com/example/englishword/ui/components/LevelCard.kt`
-- `app/src/main/java/com/example/englishword/ui/components/StreakBadge.kt`
-- `app/src/main/java/com/example/englishword/ui/settings/PremiumScreen.kt`
-- `app/src/main/res/xml/backup_rules.xml`
-- `app/src/main/res/xml/data_extraction_rules.xml`
-- `gradle.properties`
 - `handoff.md`

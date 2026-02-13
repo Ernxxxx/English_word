@@ -220,7 +220,7 @@ class WordRepository @Inject constructor(
 
     /**
      * Get words that are due for review for a specific level.
-     * Returns new words (nextReviewAt is null) first, then words due for review.
+     * Returns due words first, then fills remaining slots with new words.
      */
     suspend fun getWordsForReview(levelId: Long, limit: Int = 20): List<Word> {
         return try {
@@ -228,6 +228,31 @@ class WordRepository @Inject constructor(
             wordDao.getWordsForReview(levelId, currentTime, SrsCalculator.MAX_LEVEL, limit)
         } catch (e: Exception) {
             Log.e(TAG, "getWordsForReview failed", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Get only due review words for a specific level.
+     */
+    suspend fun getDueWordsForReview(levelId: Long, limit: Int = 20): List<Word> {
+        return try {
+            val currentTime = System.currentTimeMillis()
+            wordDao.getDueWordsForReview(levelId, currentTime, SrsCalculator.MAX_LEVEL, limit)
+        } catch (e: Exception) {
+            Log.e(TAG, "getDueWordsForReview failed", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Get only new words for a specific level.
+     */
+    suspend fun getNewWordsForReview(levelId: Long, limit: Int = 20): List<Word> {
+        return try {
+            wordDao.getNewWordsForReview(levelId, SrsCalculator.MAX_LEVEL, limit)
+        } catch (e: Exception) {
+            Log.e(TAG, "getNewWordsForReview failed", e)
             emptyList()
         }
     }
