@@ -56,8 +56,96 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.englishword.ui.theme.AppDimens
 import com.example.englishword.ui.theme.CorrectGreen
 import com.example.englishword.ui.theme.StreakOrange
+
+/**
+ * Tab-friendly version of StatsScreen without Scaffold/TopAppBar.
+ * Used by MainShellScreen for the bottom navigation layout.
+ */
+@Composable
+fun StatsTab(
+    modifier: Modifier = Modifier,
+    viewModel: StatsViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // SRS Explanation Dialog
+    if (uiState.showSrsExplanation) {
+        AlertDialog(
+            onDismissRequest = { viewModel.hideSrsExplanation() },
+            title = { Text("取得単語とは？") },
+            text = {
+                Text(
+                    "取得単語は、ユニット内の「単語テスト」で正解した単語です。\n\n" +
+                    "学習画面で単語を見ただけでは取得になりません。\n" +
+                    "単語テストで正解すると、その単語が取得済みとして記録されます。"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.hideSrsExplanation() }) {
+                    Text("閉じる")
+                }
+            }
+        )
+    }
+
+    // Mastered Words Detail Dialog
+    if (uiState.showMasteredWordsDialog) {
+        WordListDialog(
+            title = "取得済みの単語",
+            words = uiState.masteredWordsList,
+            emptyMessage = "まだ取得済みの単語はありません",
+            onDismiss = { viewModel.hideMasteredWordsDialog() }
+        )
+    }
+
+    // Today's Studied Words Detail Dialog
+    if (uiState.showTodayWordsDialog) {
+        WordListDialog(
+            title = "今日学習した単語",
+            words = uiState.todayWordsList,
+            emptyMessage = "今日はまだ学習していません",
+            onDismiss = { viewModel.hideTodayWordsDialog() }
+        )
+    }
+
+    AnimatedVisibility(
+        visible = uiState.isLoading,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+    }
+
+    AnimatedVisibility(
+        visible = !uiState.isLoading,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
+        if (uiState.error != null) {
+            StatsErrorContent(
+                error = uiState.error.orEmpty(),
+                onRetry = { viewModel.refresh() },
+                modifier = modifier
+            )
+        } else {
+            StatsContent(
+                uiState = uiState,
+                onMasteredCardClick = { viewModel.showMasteredWordsDialog() },
+                onTodayCardClick = { viewModel.showTodayWordsDialog() },
+                onSrsHelpClick = { viewModel.showSrsExplanation() },
+                modifier = modifier
+            )
+        }
+    }
+}
 
 /**
  * Statistics screen displaying learning progress, charts, and streak information.
@@ -78,17 +166,12 @@ fun StatsScreen(
     if (uiState.showSrsExplanation) {
         AlertDialog(
             onDismissRequest = { viewModel.hideSrsExplanation() },
-            title = { Text("習得単語とは？") },
+            title = { Text("取得単語とは？") },
             text = {
                 Text(
-                    "単語の習熟度は5段階で上がります。\n\n" +
-                    "1回目「覚えた」→ 1時間後に復習\n" +
-                    "2回目「覚えた」→ 8時間後に復習\n" +
-                    "3回目「覚えた」→ 1日後に復習\n" +
-                    "4回目「覚えた」→ 3日後に復習\n" +
-                    "5回目「覚えた」→ 習得完了\n\n" +
-                    "同じ単語を間隔を空けて5回正解すると「習得済み」になります。" +
-                    "これは科学的に効果が証明されている間隔反復学習（SRS）です。"
+                    "取得単語は、ユニット内の「単語テスト」で正解した単語です。\n\n" +
+                    "学習画面で単語を見ただけでは取得になりません。\n" +
+                    "単語テストで正解すると、その単語が取得済みとして記録されます。"
                 )
             },
             confirmButton = {
@@ -102,9 +185,9 @@ fun StatsScreen(
     // Mastered Words Detail Dialog
     if (uiState.showMasteredWordsDialog) {
         WordListDialog(
-            title = "習得済みの単語",
+            title = "取得済みの単語",
             words = uiState.masteredWordsList,
-            emptyMessage = "まだ習得済みの単語はありません",
+            emptyMessage = "まだ取得済みの単語はありません",
             onDismiss = { viewModel.hideMasteredWordsDialog() }
         )
     }
@@ -307,13 +390,13 @@ private fun OverviewCardsSection(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             StatCard(
-                title = "習得単語",
-                value = "${uiState.totalWordsMastered}",
+                title = "取得単語",
+                value = "${uiState.totalWordsAcquired}",
                 subtitle = "/ ${uiState.totalWords}語",
                 icon = Icons.Default.CheckCircle,
                 iconTint = CorrectGreen,
                 progress = if (uiState.totalWords > 0) {
-                    uiState.totalWordsMastered.toFloat() / uiState.totalWords
+                    uiState.totalWordsAcquired.toFloat() / uiState.totalWords
                 } else 0f,
                 onClick = onMasteredCardClick,
                 helpIcon = true,
@@ -355,6 +438,7 @@ private fun OverviewCardsSection(
                 modifier = Modifier.weight(1f)
             )
         }
+
     }
 }
 
@@ -375,8 +459,8 @@ private fun StatCard(
         modifier = modifier.then(
             if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
         ),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(AppDimens.RadiusXl),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = AppDimens.ElevationMedium),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -499,7 +583,7 @@ private fun WordListDialog(
     emptyMessage: String,
     onDismiss: () -> Unit
 ) {
-    val masteryLabels = listOf("未学習", "学習開始", "学習中", "定着中", "ほぼ習得", "習得済み")
+    val masteryLabels = listOf("未学習", "学習中", "学習中", "学習中", "学習中", "習得済み")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -597,8 +681,8 @@ private fun StatsSection(
 
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+            shape = RoundedCornerShape(AppDimens.RadiusXl),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = AppDimens.ElevationMedium),
             colors = CardDefaults.elevatedCardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             )

@@ -199,6 +199,7 @@ class HomeViewModel @Inject constructor(
             wordCount = wordCount,
             masteredCount = masteredCount,
             inProgressCount = inProgressCount,
+            studiedCount = stats?.studiedCount ?: 0,
             isLocked = isLocked,
             remainingUnlockTimeMs = remainingTime
         )
@@ -255,6 +256,28 @@ class HomeViewModel @Inject constructor(
     fun navigateToStudy(levelId: Long) {
         viewModelScope.launch {
             _events.emit(HomeEvent.NavigateToStudy(levelId))
+        }
+    }
+
+    /**
+     * Navigate to unit test screen for a level.
+     */
+    fun navigateToUnitTest(levelId: Long) {
+        viewModelScope.launch {
+            _events.emit(HomeEvent.NavigateToUnitTest(levelId))
+        }
+    }
+
+    /**
+     * Show unlock hint when unit test is not yet available.
+     */
+    fun showUnitTestLockedMessage(level: LevelWithProgress) {
+        viewModelScope.launch {
+            _events.emit(
+                HomeEvent.ShowError(
+                    "単語テストは全単語を1回以上学習すると解放されます（${level.studiedCount}/${level.wordCount}）"
+                )
+            )
         }
     }
 

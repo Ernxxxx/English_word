@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.englishword.ui.theme.AppDimens
 import com.example.englishword.ui.theme.EnglishWordTheme
 import com.example.englishword.ui.theme.StreakOrange
 
@@ -102,7 +103,7 @@ fun StreakBadge(
             // Streak count
             Text(
                 text = if (showLabel) {
-                    "連続 ${streak}日"
+                    "連続 ${streak}日目"
                 } else {
                     streak.toString()
                 },
@@ -148,11 +149,11 @@ fun StreakBadgeJapanese(
 
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(AppDimens.RadiusXl),
         color = backgroundColor
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = AppDimens.SpacingMd, vertical = AppDimens.SpacingSm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -204,9 +205,9 @@ fun StreakDisplay(
                         )
                     )
                 },
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(AppDimens.RadiusXxl)
             )
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = AppDimens.SpacingXl, vertical = AppDimens.SpacingMd),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -226,7 +227,7 @@ fun StreakDisplay(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "日",
+                text = "日目",
                 color = if (isActive) {
                     StreakOrange.copy(alpha = 0.8f)
                 } else {

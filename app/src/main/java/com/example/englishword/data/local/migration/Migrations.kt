@@ -14,6 +14,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * - Version 5: Added responseTimeMs column to study_records
  * - Version 6: Added composite index on words(levelId, nextReviewAt)
  * - Version 7: Added composite index on study_records(sessionId, wordId)
+ * - Version 8: Deduplicated words and added unique index on words(levelId, english)
+ * - Version 9: Added acquisition flag (words.isAcquired) for unit tests
  */
 object Migrations {
 
@@ -376,6 +378,17 @@ object Migrations {
     }
 
     /**
+     * Migration from version 8 to 9.
+     * Adds words.isAcquired for "unit test correct => acquired" tracking.
+     */
+    val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL("ALTER TABLE words ADD COLUMN isAcquired INTEGER NOT NULL DEFAULT 0")
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_words_isAcquired` ON `words` (`isAcquired`)")
+        }
+    }
+
+    /**
      * Get all migrations for the database builder.
      */
     fun getAllMigrations(): Array<Migration> {
@@ -407,7 +420,8 @@ object Migrations {
             MIGRATION_4_8,
             MIGRATION_3_8,
             MIGRATION_2_8,
-            MIGRATION_1_8
+            MIGRATION_1_8,
+            MIGRATION_8_9
         )
     }
 }

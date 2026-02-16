@@ -32,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -498,14 +499,11 @@ private fun Color.luminance(): Float {
 // 3. MasteryDonutChart
 // ============================================================
 
-// Colors for mastery levels 0-5 (red -> orange -> yellow -> light green -> green -> deep green)
+// Colors for 3 mastery categories: 未学習 / 学習中 / 習得済み
 private val MasteryColors = listOf(
-    Color(0xFFE53935), // Level 0 - Red (unseen / new)
-    MasteryLevel1,     // Level 1 - Red-orange
-    MasteryLevel2,     // Level 2 - Orange
-    MasteryLevel3,     // Level 3 - Yellow
-    MasteryLevel4,     // Level 4 - Light green
-    MasteryLevel5      // Level 5 - Green (mastered)
+    Color(0xFFE53935).copy(alpha = 0.4f), // Category 0 - 未学習 (faded red)
+    Color(0xFFFFA726),                     // Category 1 - 学習中 (orange)
+    Color(0xFF4CAF50)                      // Category 2 - 習得済み (green)
 )
 
 /**
@@ -642,18 +640,15 @@ fun MasteryDonutChart(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Legend
-        FlowRow(
+        // Legend: 3 categories
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             distribution.forEach { entry ->
                 val colorIndex = entry.level.coerceIn(0, MasteryColors.lastIndex)
-                Row(
-                    modifier = Modifier.padding(horizontal = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                val percent = if (totalWords > 0) (entry.count * 100) / totalWords else 0
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
                             .size(10.dp)
@@ -661,7 +656,7 @@ fun MasteryDonutChart(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "${entry.label} (${entry.count})",
+                        text = "${entry.label} ${entry.count}語(${percent}%)",
                         style = MaterialTheme.typography.labelSmall,
                         color = onSurfaceVariantColor
                     )
@@ -670,6 +665,7 @@ fun MasteryDonutChart(
         }
     }
 }
+
 
 // ============================================================
 // 4. StreakCard
@@ -936,11 +932,8 @@ private fun MasteryDonutChartPreview() {
             MasteryDonutChart(
                 distribution = listOf(
                     MasteryLevel(0, 45, "未学習"),
-                    MasteryLevel(1, 30, "学習開始"),
-                    MasteryLevel(2, 25, "学習中"),
-                    MasteryLevel(3, 40, "定着中"),
-                    MasteryLevel(4, 35, "ほぼ習得"),
-                    MasteryLevel(5, 75, "習得済み")
+                    MasteryLevel(1, 130, "学習中"),
+                    MasteryLevel(2, 75, "習得済み")
                 ),
                 modifier = Modifier.padding(16.dp)
             )
@@ -956,11 +949,8 @@ private fun MasteryDonutChartDarkPreview() {
             MasteryDonutChart(
                 distribution = listOf(
                     MasteryLevel(0, 45, "未学習"),
-                    MasteryLevel(1, 30, "学習開始"),
-                    MasteryLevel(2, 25, "学習中"),
-                    MasteryLevel(3, 40, "定着中"),
-                    MasteryLevel(4, 35, "ほぼ習得"),
-                    MasteryLevel(5, 75, "習得済み")
+                    MasteryLevel(1, 130, "学習中"),
+                    MasteryLevel(2, 75, "習得済み")
                 ),
                 modifier = Modifier.padding(16.dp)
             )

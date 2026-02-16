@@ -26,6 +26,12 @@ data class LevelWithProgress(
     val inProgressCount: Int = 0,
 
     /**
+     * Number of words studied at least once (reviewCount >= 1).
+     * Used for unit test unlock condition.
+     */
+    val studiedCount: Int = 0,
+
+    /**
      * Whether this level is locked (free tier only).
      * Premium users always have isLocked = false.
      */
@@ -78,6 +84,12 @@ data class LevelWithProgress(
      */
     val isCompleted: Boolean
         get() = wordCount > 0 && masteredCount >= wordCount
+
+    /**
+     * Unit test is unlocked when all words in the unit were studied at least once.
+     */
+    val isTestUnlocked: Boolean
+        get() = wordCount > 0 && studiedCount >= wordCount
 
     /**
      * Checks if this level has no words.
@@ -177,14 +189,20 @@ data class ParentLevelWithChildren(
         get() = children.sumOf { it.masteredCount }
 
     /**
-     * Combined progress fraction.
+     * Total in-progress count across all children.
      */
-    val progressFraction: Float
-        get() = if (totalWordCount == 0) 0f else totalMasteredCount.toFloat() / totalWordCount
+    val totalInProgressCount: Int
+        get() = children.sumOf { it.inProgressCount }
 
     /**
-     * Combined progress percentage.
+     * Combined progress fraction (mastered + in-progress, matching child level calculation).
+     */
+    val progressFraction: Float
+        get() = if (totalWordCount == 0) 0f else (totalMasteredCount + totalInProgressCount).toFloat() / totalWordCount
+
+    /**
+     * Combined progress percentage (mastered + in-progress, matching child level calculation).
      */
     val progressPercent: Int
-        get() = if (totalWordCount == 0) 0 else (totalMasteredCount * 100) / totalWordCount
+        get() = if (totalWordCount == 0) 0 else ((totalMasteredCount + totalInProgressCount) * 100) / totalWordCount
 }

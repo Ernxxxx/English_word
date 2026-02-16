@@ -61,6 +61,9 @@ data class StatsUiState(
     val maxStreak: Int = 0,
     val totalWordsStudied: Int = 0,
     val totalWordsMastered: Int = 0,
+    val totalWordsAcquired: Int = 0,
+    val rememberedNewWords: Int = 0,
+    val rememberedReviewWords: Int = 0,
     val totalWords: Int = 0,
     val averageDaily: Float = 0f,
     val masteryDistribution: List<MasteryLevel> = emptyList(),
@@ -91,14 +94,11 @@ class StatsViewModel @Inject constructor(
         private const val WEEKLY_DAYS = 7
         private const val MONTHLY_DAYS = 30
 
-        /** Human-readable labels for mastery levels 0-5. */
-        private val MASTERY_LABELS = listOf(
-            "未学習",    // 0: Not yet studied
-            "学習開始",  // 1: First exposure
-            "学習中",    // 2: Learning
-            "定着中",    // 3: Familiar
-            "ほぼ習得",  // 4: Almost mastered
-            "習得済み"   // 5: Fully mastered
+        /** Human-readable labels for the 3 mastery categories. */
+        private val CATEGORY_LABELS = listOf(
+            "未学習",    // 0: masteryLevel == 0
+            "学習中",    // 1: masteryLevel 1-4
+            "習得済み"   // 2: masteryLevel >= 5
         )
     }
 
@@ -130,14 +130,36 @@ class StatsViewModel @Inject constructor(
                 val weeklyDates = generateDateRange(WEEKLY_DAYS)
                 val monthlyDates = generateDateRange(MONTHLY_DAYS)
 
-                // Combine reactive Flow sources for continuous updates
-                combine(
+                // Combine reactive Flow sources for continuous updates.
+                // Keep outer combine to 4 flows to avoid vararg-array inference issues.
+                val totalCountsFlow = combine(
                     wordRepository.getTotalWordCount(),
-                    wordRepository.getTotalMasteredCount(),
+                    wordRepository.getTotalAcquiredCount()
+                ) { totalWords, totalAcquired ->
+                    totalWords to totalAcquired
+                }
+                val studySummaryFlow = combine(
                     studyRepository.getTotalWordsStudied(),
-                    studyRepository.getAverageStudiedCount(),
+                    studyRepository.getAverageStudiedCount()
+                ) { totalStudied, averageDaily ->
+                    totalStudied to averageDaily
+                }
+                val rememberedCountsFlow = combine(
+                    studyRepository.getKnownNewWordCount(),
+                    studyRepository.getKnownReviewWordCount()
+                ) { rememberedNewWords, rememberedReviewWords ->
+                    rememberedNewWords to rememberedReviewWords
+                }
+
+                combine(
+                    totalCountsFlow,
+                    studySummaryFlow,
+                    rememberedCountsFlow,
                     studyRepository.getRecentStats(MONTHLY_DAYS)
-                ) { totalWords, totalMastered, totalStudied, averageDaily, recentStats ->
+                ) { totalCounts, studySummary, rememberedCounts, recentStats ->
+                    val (totalWords, totalAcquired) = totalCounts
+                    val (totalStudied, averageDaily) = studySummary
+                    val (rememberedNewWords, rememberedReviewWords) = rememberedCounts
                     // Build a lookup map from date -> studiedCount
                     val statsMap = recentStats.associate { it.date to it.studiedCount }
 
@@ -163,7 +185,10 @@ class StatsViewModel @Inject constructor(
                         currentStreak = currentStreak,
                         maxStreak = maxStreak,
                         totalWordsStudied = totalStudied,
-                        totalWordsMastered = totalMastered,
+                        totalWordsMastered = totalAcquired,
+                        totalWordsAcquired = totalAcquired,
+                        rememberedNewWords = rememberedNewWords,
+                        rememberedReviewWords = rememberedReviewWords,
                         totalWords = totalWords,
                         averageDaily = averageDaily,
                         masteryDistribution = masteryDistribution,
@@ -186,20 +211,22 @@ class StatsViewModel @Inject constructor(
     }
 
     /**
-     * Build the full mastery distribution list (levels 0-5).
-     * Ensures all 6 levels are represented even if some have zero words.
+     * Build the mastery distribution as 3 categories: 未学習 / 学習中 / 習得済み.
+     * Aligns with home screen progress calculation.
      */
     private suspend fun buildMasteryDistribution(): List<MasteryLevel> {
         val rawDistribution = wordRepository.getMasteryDistribution()
         val countMap = rawDistribution.associate { it.masteryLevel to it.count }
 
-        return (0..SrsCalculator.MAX_LEVEL).map { level ->
-            MasteryLevel(
-                level = level,
-                count = countMap[level] ?: 0,
-                label = MASTERY_LABELS.getOrElse(level) { "Level $level" }
-            )
-        }
+        val notStarted = countMap[0] ?: 0
+        val learning = (1 until SrsCalculator.MAX_LEVEL).sumOf { countMap[it] ?: 0 }
+        val mastered = countMap[SrsCalculator.MAX_LEVEL] ?: 0
+
+        return listOf(
+            MasteryLevel(level = 0, count = notStarted, label = CATEGORY_LABELS[0]),
+            MasteryLevel(level = 1, count = learning, label = CATEGORY_LABELS[1]),
+            MasteryLevel(level = 2, count = mastered, label = CATEGORY_LABELS[2])
+        )
     }
 
     /**
@@ -235,7 +262,7 @@ class StatsViewModel @Inject constructor(
 
     fun showMasteredWordsDialog() {
         viewModelScope.launch {
-            val words = wordDao.getMasteredWordsListSync(SrsCalculator.MAX_LEVEL).map {
+            val words = wordDao.getAcquiredWordsListSync().map {
                 WordSummary(english = it.english, japanese = it.japanese, masteryLevel = it.masteryLevel)
             }
             _uiState.update { it.copy(showMasteredWordsDialog = true, masteredWordsList = words) }

@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.englishword.ui.study.EvaluationResult
+import com.example.englishword.ui.theme.AppDimens
 import com.example.englishword.ui.theme.EnglishWordTheme
 import com.example.englishword.ui.theme.EvaluationAgain
 import com.example.englishword.ui.theme.EvaluationKnown
@@ -115,7 +116,7 @@ private fun EvaluationButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(72.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(AppDimens.RadiusLg),
         colors = ButtonDefaults.buttonColors(
             containerColor = backgroundColor,
             contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -123,8 +124,8 @@ private fun EvaluationButton(
             disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
         ),
         elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 1.dp,
-            pressedElevation = 0.dp
+            defaultElevation = AppDimens.ElevationLow,
+            pressedElevation = AppDimens.ElevationNone
         )
     ) {
         Column(

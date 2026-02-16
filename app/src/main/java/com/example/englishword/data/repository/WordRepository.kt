@@ -131,6 +131,26 @@ class WordRepository @Inject constructor(
         }
     }
 
+    // ==================== Study Mode Count Operations ====================
+
+    suspend fun getReviewWordCount(levelId: Long): Int {
+        return try {
+            wordDao.getReviewWordCount(levelId, SrsCalculator.MAX_LEVEL)
+        } catch (e: Exception) {
+            Log.e(TAG, "getReviewWordCount failed", e)
+            0
+        }
+    }
+
+    suspend fun getNewWordCount(levelId: Long): Int {
+        return try {
+            wordDao.getNewWordCount(levelId, SrsCalculator.MAX_LEVEL)
+        } catch (e: Exception) {
+            Log.e(TAG, "getNewWordCount failed", e)
+            0
+        }
+    }
+
     // ==================== Count Operations ====================
 
     /**
@@ -166,6 +186,17 @@ class WordRepository @Inject constructor(
             }
     }
 
+    /**
+     * Get total acquired word count (words answered correctly in unit tests).
+     */
+    fun getTotalAcquiredCount(): Flow<Int> {
+        return wordDao.getTotalAcquiredCount()
+            .catch { e ->
+                Log.e(TAG, "getTotalAcquiredCount failed", e)
+                emit(0)
+            }
+    }
+
     // ==================== Suspend Count Operations (for Statistics Screen) ====================
 
     /**
@@ -188,6 +219,18 @@ class WordRepository @Inject constructor(
             wordDao.getTotalMasteredCountSync(SrsCalculator.MAX_LEVEL)
         } catch (e: Exception) {
             Log.e(TAG, "getTotalMasteredCountSync failed", e)
+            0
+        }
+    }
+
+    /**
+     * Get total acquired word count synchronously.
+     */
+    suspend fun getTotalAcquiredCountSync(): Int {
+        return try {
+            wordDao.getTotalAcquiredCountSync()
+        } catch (e: Exception) {
+            Log.e(TAG, "getTotalAcquiredCountSync failed", e)
             0
         }
     }
@@ -233,7 +276,8 @@ class WordRepository @Inject constructor(
     }
 
     /**
-     * Get only due review words for a specific level.
+     * Get review words for review-only mode for a specific level.
+     * Includes already-reviewed words and prioritizes due words first.
      */
     suspend fun getDueWordsForReview(levelId: Long, limit: Int = 20): List<Word> {
         return try {
@@ -395,6 +439,19 @@ class WordRepository @Inject constructor(
             true
         } catch (e: Exception) {
             Log.e(TAG, "updateMastery failed", e)
+            false
+        }
+    }
+
+    /**
+     * Mark word as acquired when answered correctly in unit test.
+     */
+    suspend fun markWordAcquired(wordId: Long): Boolean {
+        return try {
+            val updatedRows = wordDao.markWordAcquired(wordId, SrsCalculator.MAX_LEVEL)
+            updatedRows == 1
+        } catch (e: Exception) {
+            Log.e(TAG, "markWordAcquired failed", e)
             false
         }
     }

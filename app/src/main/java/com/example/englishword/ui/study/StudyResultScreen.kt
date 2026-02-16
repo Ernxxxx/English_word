@@ -61,7 +61,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.englishword.ads.AdManager
-import com.example.englishword.ui.components.BannerAdView
+import com.example.englishword.ui.components.SimpleBannerAdView
+import com.example.englishword.ui.theme.AppDimens
 import com.example.englishword.ui.theme.CorrectGreen
 import com.example.englishword.ui.theme.EnglishWordTheme
 import com.example.englishword.ui.theme.IncorrectRed
@@ -144,8 +145,7 @@ fun StudyResultContent(
         bottomBar = {
             // Banner ad at bottom (hidden for premium users)
             if (!isPremium) {
-                BannerAdView(
-                    adUnitId = AdManager.BANNER_AD_UNIT_ID,
+                SimpleBannerAdView(
                     isPremium = isPremium,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -320,8 +320,8 @@ private fun StatsCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        shape = RoundedCornerShape(AppDimens.RadiusXl),
+        elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.ElevationHigh),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -426,7 +426,7 @@ private fun StatItem(
 private fun StreakDisplay(streak: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(AppDimens.RadiusXl),
         colors = CardDefaults.cardColors(
             containerColor = StreakOrange.copy(alpha = 0.1f)
         )
@@ -444,7 +444,7 @@ private fun StreakDisplay(streak: Int) {
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "${streak}日継続中！",
+                text = "${streak}日目継続中！",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = StreakOrange

@@ -26,6 +26,13 @@ enum class StudyWordMode {
     NEW_ONLY
 }
 
+data class StudyModeCounts(
+    val reviewCount: Int = 0,
+    val newCount: Int = 0
+) {
+    val autoCount: Int get() = reviewCount + newCount
+}
+
 /**
  * ViewModel for the Study screen.
  * Manages the study session, card flipping, word evaluation, and quiz mode.
@@ -69,6 +76,12 @@ class StudyViewModel @Inject constructor(
         super.onCleared()
     }
 
+    suspend fun getModeCounts(levelId: Long): StudyModeCounts {
+        val review = wordRepository.getReviewWordCount(levelId)
+        val new = wordRepository.getNewWordCount(levelId)
+        return StudyModeCounts(reviewCount = review, newCount = new)
+    }
+
     /**
      * Load words for study from the specified level.
      * First checks for an incomplete session to resume.
@@ -107,13 +120,14 @@ class StudyViewModel @Inject constructor(
                     }
                 }
 
-                // Check for incomplete session to resume
-                val incompleteSession = studyRepository.getIncompleteSessionForLevel(levelId)
-
-                if (incompleteSession != null && incompleteSession.isInProgress) {
-                    // Resume incomplete session
-                    resumeSession(incompleteSession)
-                    return@launch
+                // Check for incomplete session to resume (only if AUTO mode, since
+                // the old session may contain words from a different mode)
+                if (studyWordMode == StudyWordMode.AUTO) {
+                    val incompleteSession = studyRepository.getIncompleteSessionForLevel(levelId)
+                    if (incompleteSession != null && incompleteSession.isInProgress) {
+                        resumeSession(incompleteSession)
+                        return@launch
+                    }
                 }
 
                 // Start fresh session

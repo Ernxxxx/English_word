@@ -112,6 +112,40 @@ interface StudyRecordDao {
     @Query("SELECT COUNT(*) FROM study_records WHERE sessionId = :sessionId AND result = :result")
     suspend fun getResultCount(sessionId: Long, result: Int): Int
 
+    // Count words that were remembered on their first-ever attempt (new word remembered).
+    @Query(
+        """
+        SELECT COUNT(*) FROM study_records sr
+        WHERE sr.result = 2
+          AND NOT EXISTS (
+            SELECT 1 FROM study_records prev
+            WHERE prev.wordId = sr.wordId
+              AND (
+                prev.reviewedAt < sr.reviewedAt
+                OR (prev.reviewedAt = sr.reviewedAt AND prev.id < sr.id)
+              )
+          )
+        """
+    )
+    fun getKnownNewWordCount(): Flow<Int>
+
+    // Count distinct words remembered after at least one prior attempt (review remembered).
+    @Query(
+        """
+        SELECT COUNT(DISTINCT sr.wordId) FROM study_records sr
+        WHERE sr.result = 2
+          AND EXISTS (
+            SELECT 1 FROM study_records prev
+            WHERE prev.wordId = sr.wordId
+              AND (
+                prev.reviewedAt < sr.reviewedAt
+                OR (prev.reviewedAt = sr.reviewedAt AND prev.id < sr.id)
+              )
+          )
+        """
+    )
+    fun getKnownReviewWordCount(): Flow<Int>
+
     // Get accuracy for a session (percentage of result = 2)
     @Query("""
         SELECT CAST(SUM(CASE WHEN result = 2 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100

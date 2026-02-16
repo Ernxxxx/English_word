@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import com.example.englishword.domain.model.Level
 import com.example.englishword.domain.model.LevelWithProgress
 import com.example.englishword.ui.theme.CorrectGreen
+import com.example.englishword.ui.theme.AppDimens
 import com.example.englishword.ui.theme.EnglishWordTheme
 
 /**
@@ -109,13 +110,13 @@ fun LevelCard(
                     showMenu = true
                 }
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(AppDimens.RadiusXl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 1.dp,
-            pressedElevation = 1.dp
+            defaultElevation = AppDimens.ElevationLow,
+            pressedElevation = AppDimens.ElevationLow
         )
     ) {
         Column(

@@ -122,6 +122,7 @@ data class HomeUiState(
  */
 sealed class HomeEvent {
     data class NavigateToStudy(val levelId: Long) : HomeEvent()
+    data class NavigateToUnitTest(val levelId: Long) : HomeEvent()
     data class NavigateToWordList(val levelId: Long) : HomeEvent()
     data object NavigateToSettings : HomeEvent()
     data object NavigateToPremium : HomeEvent()

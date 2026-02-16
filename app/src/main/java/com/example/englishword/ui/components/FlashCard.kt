@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.englishword.data.local.entity.Word
+import com.example.englishword.ui.theme.AppDimens
 import com.example.englishword.ui.theme.EnglishWordTheme
 
 /**
@@ -62,10 +63,10 @@ fun FlashCard(
                 rotationY = rotation
                 cameraDistance = 12f * density
             },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(AppDimens.RadiusXxl),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 3.dp,
-            pressedElevation = 1.dp
+            defaultElevation = AppDimens.ElevationHigh,
+            pressedElevation = AppDimens.ElevationLow
         ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface

@@ -66,6 +66,153 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.englishword.data.repository.SettingsRepository
 
+/**
+ * Tab-friendly version of SettingsScreen without Scaffold/TopAppBar.
+ * Used by MainShellScreen for the bottom navigation layout.
+ */
+@Composable
+fun SettingsTab(
+    onNavigateToPremium: () -> Unit,
+    snackbarHostState: SnackbarHostState,
+    modifier: Modifier = Modifier,
+    viewModel: SettingsViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.onEvent(SettingsEvent.ClearError)
+        }
+    }
+
+    if (uiState.isLoading) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+    } else {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+            // Premium banner (if not premium)
+            if (!uiState.isPremium) {
+                PremiumBanner(onClick = onNavigateToPremium)
+            }
+
+            // Study Settings Section
+            SettingsSection(title = "学習設定") {
+                DailyGoalItem(
+                    currentGoal = uiState.dailyGoal,
+                    onGoalChanged = { viewModel.onEvent(SettingsEvent.DailyGoalChanged(it)) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SwitchListItem(
+                    icon = Icons.Default.Notifications,
+                    title = "通知",
+                    subtitle = if (uiState.isNotificationEnabled) "オン" else "オフ",
+                    checked = uiState.isNotificationEnabled,
+                    onCheckedChange = { viewModel.onEvent(SettingsEvent.NotificationEnabledChanged(it)) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SwitchListItem(
+                    icon = Icons.Default.TrackChanges,
+                    title = "出題方向",
+                    subtitle = if (uiState.isStudyDirectionReversed) "日本語→英語" else "英語→日本語",
+                    checked = uiState.isStudyDirectionReversed,
+                    onCheckedChange = { viewModel.onEvent(SettingsEvent.StudyDirectionReversedChanged(it)) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SwitchListItem(
+                    icon = Icons.Default.Quiz,
+                    title = "学習モード",
+                    subtitle = if (uiState.isQuizMode) "4択クイズ" else "フラッシュカード",
+                    checked = uiState.isQuizMode,
+                    onCheckedChange = { viewModel.onEvent(SettingsEvent.StudyModeChanged(it)) }
+                )
+            }
+
+            // Display Settings Section
+            SettingsSection(title = "表示設定") {
+                DarkModeItem(
+                    currentMode = uiState.darkMode,
+                    displayText = uiState.darkModeDisplayText,
+                    onModeChanged = { viewModel.onEvent(SettingsEvent.DarkModeChanged(it)) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SwitchListItem(
+                    icon = Icons.Default.VolumeUp,
+                    title = "効果音",
+                    subtitle = if (uiState.soundEnabled) "オン" else "オフ",
+                    checked = uiState.soundEnabled,
+                    onCheckedChange = { viewModel.onEvent(SettingsEvent.SoundEnabledChanged(it)) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SwitchListItem(
+                    icon = Icons.Default.Vibration,
+                    title = "振動",
+                    subtitle = if (uiState.vibrationEnabled) "オン" else "オフ",
+                    checked = uiState.vibrationEnabled,
+                    onCheckedChange = { viewModel.onEvent(SettingsEvent.VibrationEnabledChanged(it)) }
+                )
+            }
+
+            // Other Section
+            SettingsSection(title = "その他") {
+                ClickableListItem(
+                    icon = Icons.Default.Policy,
+                    title = "利用規約",
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/terms"))
+                        context.startActivity(intent)
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ClickableListItem(
+                    icon = Icons.Default.Policy,
+                    title = "プライバシーポリシー",
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/privacy"))
+                        context.startActivity(intent)
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ClickableListItem(
+                    icon = Icons.Default.Email,
+                    title = "お問い合わせ",
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                            data = Uri.parse("mailto:support@example.com")
+                            putExtra(Intent.EXTRA_SUBJECT, "English Word アプリについて")
+                        }
+                        context.startActivity(intent)
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ListItem(
+                    leadingContent = {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    headlineContent = { Text("バージョン") },
+                    supportingContent = { Text(uiState.appVersion) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(

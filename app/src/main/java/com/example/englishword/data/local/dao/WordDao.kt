@@ -16,7 +16,8 @@ data class LevelWordStats(
     val levelId: Long,
     val wordCount: Int,
     val masteredCount: Int,
-    val inProgressCount: Int
+    val inProgressCount: Int,
+    val studiedCount: Int
 )
 
 /**
@@ -34,7 +35,8 @@ interface WordDao {
         SELECT levelId,
                COUNT(*) as wordCount,
                SUM(CASE WHEN masteryLevel >= :maxMasteryLevel THEN 1 ELSE 0 END) as masteredCount,
-               SUM(CASE WHEN masteryLevel >= 1 AND masteryLevel < :maxMasteryLevel THEN 1 ELSE 0 END) as inProgressCount
+               SUM(CASE WHEN masteryLevel >= 1 AND masteryLevel < :maxMasteryLevel THEN 1 ELSE 0 END) as inProgressCount,
+               SUM(CASE WHEN reviewCount >= 1 THEN 1 ELSE 0 END) as studiedCount
         FROM words
         GROUP BY levelId
     """)
@@ -80,14 +82,21 @@ interface WordDao {
         limit: Int = 20
     ): List<Word>
 
-    // Get only due review words (exclude new words)
+    // Get review words for review-only mode (exclude new words).
+    // Prioritize due words first, then other already-reviewed words.
     @Query("""
         SELECT * FROM words
         WHERE levelId = :levelId
         AND masteryLevel < :maxMasteryLevel
-        AND nextReviewAt IS NOT NULL
-        AND nextReviewAt <= :currentTime
-        ORDER BY nextReviewAt ASC
+        AND reviewCount >= 1
+        ORDER BY
+            CASE
+                WHEN nextReviewAt IS NOT NULL AND nextReviewAt <= :currentTime THEN 0
+                ELSE 1
+            END,
+            CASE WHEN nextReviewAt IS NULL THEN 1 ELSE 0 END,
+            nextReviewAt ASC,
+            updatedAt DESC
         LIMIT :limit
     """)
     suspend fun getDueWordsForReview(
@@ -178,12 +187,18 @@ interface WordDao {
     @Query("SELECT COUNT(*) FROM words WHERE masteryLevel >= :maxMasteryLevel")
     fun getTotalMasteredCount(maxMasteryLevel: Int): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM words WHERE isAcquired = 1")
+    fun getTotalAcquiredCount(): Flow<Int>
+
     // Suspend count queries for statistics screen
     @Query("SELECT COUNT(*) FROM words")
     suspend fun getTotalWordCountSync(): Int
 
     @Query("SELECT COUNT(*) FROM words WHERE masteryLevel >= :maxMasteryLevel")
     suspend fun getTotalMasteredCountSync(maxMasteryLevel: Int): Int
+
+    @Query("SELECT COUNT(*) FROM words WHERE isAcquired = 1")
+    suspend fun getTotalAcquiredCountSync(): Int
 
     // Mastery distribution for statistics screen
     @Query("SELECT masteryLevel, COUNT(*) as count FROM words GROUP BY masteryLevel ORDER BY masteryLevel ASC")
@@ -193,6 +208,10 @@ interface WordDao {
     @Query("SELECT * FROM words WHERE masteryLevel >= :maxMasteryLevel ORDER BY updatedAt DESC")
     suspend fun getMasteredWordsListSync(maxMasteryLevel: Int): List<Word>
 
+    // Get all acquired words (for unit-test based stats)
+    @Query("SELECT * FROM words WHERE isAcquired = 1 ORDER BY updatedAt DESC")
+    suspend fun getAcquiredWordsListSync(): List<Word>
+
     // Get words studied today (from study records)
     @Query("""
         SELECT DISTINCT w.* FROM words w
@@ -201,6 +220,24 @@ interface WordDao {
         ORDER BY sr.reviewedAt DESC
     """)
     suspend fun getTodayStudiedWordsSync(todayStartMs: Long): List<Word>
+
+    // Count of review-eligible words (studied at least once, not yet mastered)
+    @Query("""
+        SELECT COUNT(*) FROM words
+        WHERE levelId = :levelId
+        AND masteryLevel < :maxMasteryLevel
+        AND reviewCount >= 1
+    """)
+    suspend fun getReviewWordCount(levelId: Long, maxMasteryLevel: Int): Int
+
+    // Count of new words (never reviewed, not yet mastered)
+    @Query("""
+        SELECT COUNT(*) FROM words
+        WHERE levelId = :levelId
+        AND masteryLevel < :maxMasteryLevel
+        AND nextReviewAt IS NULL
+    """)
+    suspend fun getNewWordCount(levelId: Long, maxMasteryLevel: Int): Int
 
     // Update mastery level
     @Query("""
@@ -217,4 +254,17 @@ interface WordDao {
         nextReviewAt: Long?,
         updatedAt: Long = System.currentTimeMillis()
     )
+
+    @Query("""
+        UPDATE words
+        SET isAcquired = 1,
+            masteryLevel = CASE WHEN masteryLevel < :maxMasteryLevel THEN :maxMasteryLevel ELSE masteryLevel END,
+            updatedAt = :updatedAt
+        WHERE id = :wordId
+    """)
+    suspend fun markWordAcquired(
+        wordId: Long,
+        maxMasteryLevel: Int,
+        updatedAt: Long = System.currentTimeMillis()
+    ): Int
 }

@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import com.example.englishword.ui.theme.AppDimens
 import com.example.englishword.ui.theme.MasteryLevel1
 import com.example.englishword.ui.theme.MasteryLevel2
 import com.example.englishword.ui.theme.MasteryLevel3
@@ -49,9 +50,8 @@ import com.example.englishword.ui.theme.MasteryLevel5
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.englishword.ads.AdManager
 import com.example.englishword.data.local.entity.Word
-import com.example.englishword.ui.components.BannerAdView
+import com.example.englishword.ui.components.SimpleBannerAdView
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,8 +87,7 @@ fun WordListScreen(
         bottomBar = {
             // Banner ad at bottom (hidden for premium users)
             if (!uiState.isPremium) {
-                BannerAdView(
-                    adUnitId = AdManager.BANNER_AD_UNIT_ID,
+                SimpleBannerAdView(
                     isPremium = uiState.isPremium,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -187,7 +186,7 @@ private fun WordListItem(word: Word) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.ElevationMedium),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )

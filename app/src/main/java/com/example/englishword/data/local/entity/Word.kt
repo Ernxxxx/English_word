@@ -20,6 +20,7 @@ import androidx.room.PrimaryKey
         Index(value = ["english"]),
         Index(value = ["masteryLevel"]),
         Index(value = ["nextReviewAt"]),
+        Index(value = ["isAcquired"]),
         Index(value = ["levelId", "nextReviewAt"]),
         Index(value = ["levelId", "english"], unique = true)
     ]
@@ -35,6 +36,7 @@ data class Word(
     val masteryLevel: Int = 0, // 0-5: 0=new, 1-4=learning, 5=mastered
     val nextReviewAt: Long? = null,
     val reviewCount: Int = 0,
+    val isAcquired: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

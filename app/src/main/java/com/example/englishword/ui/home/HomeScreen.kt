@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Star
@@ -58,11 +59,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,13 +87,116 @@ import com.example.englishword.domain.model.Level
 import com.example.englishword.domain.model.LevelWithProgress
 import com.example.englishword.domain.model.ParentLevelWithChildren
 import com.example.englishword.ads.AdManager
-import com.example.englishword.ui.components.BannerAdView
+import com.example.englishword.ui.components.SimpleBannerAdView
 import com.example.englishword.ui.components.LevelCard
 import com.example.englishword.ui.components.StreakBadgeJapanese
+import com.example.englishword.ui.components.LoadingContent
+import com.example.englishword.ui.components.ErrorContent
 import com.example.englishword.ui.theme.CorrectGreen
 import com.example.englishword.ui.theme.EnglishWordTheme
+import com.example.englishword.ui.theme.AppDimens
 import com.example.englishword.ui.theme.PremiumGold
 import kotlinx.coroutines.flow.collectLatest
+
+/**
+ * Tab-friendly version of HomeScreen without Scaffold/TopAppBar/BannerAd.
+ * Used by MainShellScreen for the bottom navigation layout.
+ */
+@Composable
+fun HomeTab(
+    onNavigateToStudy: (Long) -> Unit,
+    onNavigateToUnitTest: (Long) -> Unit,
+    onNavigateToWordList: (Long) -> Unit,
+    onNavigateToPremium: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: HomeViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val listState = rememberLazyListState()
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Refresh stats when returning from study/test screens
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collectLatest { event ->
+            when (event) {
+                is HomeEvent.NavigateToStudy -> onNavigateToStudy(event.levelId)
+                is HomeEvent.NavigateToUnitTest -> onNavigateToUnitTest(event.levelId)
+                is HomeEvent.NavigateToWordList -> onNavigateToWordList(event.levelId)
+                is HomeEvent.NavigateToSettings -> { /* handled by MainShellScreen tab */ }
+                is HomeEvent.NavigateToPremium -> onNavigateToPremium()
+                is HomeEvent.ShowError -> { /* snackbar handled by MainShellScreen */ }
+                is HomeEvent.ShowRewardedAd -> {
+                    val activity = context as? Activity
+                    if (activity != null) {
+                        viewModel.adManager.showRewardedAd(
+                            activity = activity,
+                            onRewarded = { viewModel.onAdWatchedForUnlock(event.levelId) },
+                            onAdDismissed = {}
+                        )
+                    }
+                }
+                is HomeEvent.UnitUnlocked -> { /* snackbar handled by MainShellScreen */ }
+            }
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        when {
+            uiState.isLoading -> LoadingContent()
+            uiState.error != null -> ErrorContent(
+                message = uiState.error!!,
+                onRetry = { viewModel.refresh() }
+            )
+            else -> HomeContent(
+                uiState = uiState,
+                listState = listState,
+                onLevelClick = { viewModel.navigateToStudy(it.level.id) },
+                onUnitTestClick = { level ->
+                    if (level.isTestUnlocked) {
+                        viewModel.navigateToUnitTest(level.level.id)
+                    } else {
+                        viewModel.showUnitTestLockedMessage(level)
+                    }
+                },
+                onWordListClick = { viewModel.navigateToWordList(it.level.id) },
+                onDeleteClick = { viewModel.showDeleteDialog(it) },
+                onPremiumClick = onNavigateToPremium,
+                onParentClick = { viewModel.toggleParentExpansion(it) },
+                onUnlockClick = { viewModel.showUnlockDialog(it) }
+            )
+        }
+    }
+
+    // Dialogs
+    if (uiState.showDeleteDialog && uiState.levelToDelete != null) {
+        DeleteLevelDialog(
+            levelName = uiState.levelToDelete!!.level.name,
+            wordCount = uiState.levelToDelete!!.wordCount,
+            onDismiss = { viewModel.hideDeleteDialog() },
+            onConfirm = { viewModel.deleteLevel() }
+        )
+    }
+    if (uiState.showUnlockDialog && uiState.levelToUnlock != null) {
+        UnlockUnitDialog(
+            onDismiss = { viewModel.hideUnlockDialog() },
+            onWatchAd = { viewModel.requestWatchAdForUnlock() },
+            onPremiumClick = onNavigateToPremium
+        )
+    }
+}
 
 /**
  * Home screen displaying the list of levels and study statistics.
@@ -104,6 +212,7 @@ import kotlinx.coroutines.flow.collectLatest
 @Composable
 fun HomeScreen(
     onNavigateToStudy: (Long) -> Unit,
+    onNavigateToUnitTest: (Long) -> Unit,
     onNavigateToWordList: (Long) -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToPremium: () -> Unit,
@@ -121,6 +230,7 @@ fun HomeScreen(
         viewModel.events.collectLatest { event ->
             when (event) {
                 is HomeEvent.NavigateToStudy -> onNavigateToStudy(event.levelId)
+                is HomeEvent.NavigateToUnitTest -> onNavigateToUnitTest(event.levelId)
                 is HomeEvent.NavigateToWordList -> onNavigateToWordList(event.levelId)
                 is HomeEvent.NavigateToSettings -> onNavigateToSettings()
                 is HomeEvent.NavigateToPremium -> onNavigateToPremium()
@@ -191,7 +301,7 @@ fun HomeScreen(
                 }
                 uiState.error != null -> {
                     ErrorContent(
-                        error = uiState.error!!,
+                        message = uiState.error!!,
                         onRetry = { viewModel.refresh() }
                     )
                 }
@@ -200,6 +310,13 @@ fun HomeScreen(
                         uiState = uiState,
                         listState = listState,
                         onLevelClick = { viewModel.navigateToStudy(it.level.id) },
+                        onUnitTestClick = { level ->
+                            if (level.isTestUnlocked) {
+                                viewModel.navigateToUnitTest(level.level.id)
+                            } else {
+                                viewModel.showUnitTestLockedMessage(level)
+                            }
+                        },
                         onWordListClick = { viewModel.navigateToWordList(it.level.id) },
                         onDeleteClick = { viewModel.showDeleteDialog(it) },
                         onPremiumClick = onNavigateToPremium,
@@ -211,8 +328,7 @@ fun HomeScreen(
 
             // Added: Banner ad at bottom (above FAB) - hidden for premium users
             if (!uiState.isPremium) {
-                BannerAdView(
-                    adUnitId = AdManager.BANNER_AD_UNIT_ID,
+                SimpleBannerAdView(
                     isPremium = uiState.isPremium,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -248,6 +364,7 @@ private fun HomeContent(
     uiState: HomeUiState,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onLevelClick: (LevelWithProgress) -> Unit,
+    onUnitTestClick: (LevelWithProgress) -> Unit,
     onWordListClick: (LevelWithProgress) -> Unit,
     onDeleteClick: (LevelWithProgress) -> Unit,
     onPremiumClick: () -> Unit,
@@ -256,8 +373,8 @@ private fun HomeContent(
 ) {
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(AppDimens.SpacingLg),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingLg)
     ) {
         // Stats header
         item {
@@ -293,6 +410,7 @@ private fun HomeContent(
                     ChildLevelCard(
                         levelWithProgress = childLevel,
                         onClick = { onLevelClick(childLevel) },
+                        onUnitTestClick = { onUnitTestClick(childLevel) },
                         onWordListClick = { onWordListClick(childLevel) },
                         onUnlockClick = { onUnlockClick(childLevel.level.id) },
                         modifier = Modifier.animateItemPlacement(
@@ -319,16 +437,16 @@ private fun StatsHeader(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(AppDimens.RadiusXl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.ElevationMedium)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .padding(AppDimens.SpacingXl)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -379,7 +497,7 @@ private fun StatsHeader(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
+                    .clip(RoundedCornerShape(AppDimens.RadiusSm)),
                 color = if (progress >= 1f) CorrectGreen else MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
@@ -399,7 +517,7 @@ private fun StatsHeader(
                 Spacer(modifier = Modifier.height(12.dp))
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(AppDimens.RadiusMd),
                     color = if (remainingReviews > 0) {
                         MaterialTheme.colorScheme.secondaryContainer
                     } else {
@@ -445,11 +563,11 @@ private fun ParentLevelCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(AppDimens.RadiusXl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.ElevationLow)
     ) {
         Row(
             modifier = Modifier
@@ -471,7 +589,7 @@ private fun ParentLevelCard(
                 Text(
                     text = parentWithChildren.parentLevel.level.name,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -487,7 +605,7 @@ private fun ParentLevelCard(
                 Text(
                     text = "${parentWithChildren.progressPercent}%",
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = if (parentWithChildren.progressPercent >= 100) {
                         CorrectGreen
                     } else {
@@ -517,11 +635,14 @@ private fun ParentLevelCard(
 private fun ChildLevelCard(
     levelWithProgress: LevelWithProgress,
     onClick: () -> Unit,
+    onUnitTestClick: () -> Unit,
     onWordListClick: () -> Unit,
     onUnlockClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isLocked = levelWithProgress.isLocked
+
+    val progressFraction = (levelWithProgress.progressPercent / 100f).coerceIn(0f, 1f)
 
     Card(
         modifier = modifier
@@ -534,7 +655,7 @@ private fun ChildLevelCard(
                     onClick()
                 }
             },
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(AppDimens.RadiusLg),
         colors = CardDefaults.cardColors(
             containerColor = if (isLocked) {
                 MaterialTheme.colorScheme.surfaceContainerHighest
@@ -542,89 +663,135 @@ private fun ChildLevelCard(
                 MaterialTheme.colorScheme.surfaceContainerLow
             }
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isLocked) 0.dp else 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isLocked) AppDimens.ElevationNone else AppDimens.ElevationLow)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(12.dp)
         ) {
-            // Lock icon for locked units
-            if (isLocked) {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = "ロック中",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
+            // Row 1: Info row (lock icon, name/subtitle, progress %)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isLocked) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "ロック中",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
 
-            Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = levelWithProgress.level.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = if (isLocked) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (isLocked) {
+                            "${levelWithProgress.wordCount}語 - 広告視聴でアンロック"
+                        } else if (levelWithProgress.remainingUnlockTimeMs > 0) {
+                            val minutes = (levelWithProgress.remainingUnlockTimeMs / 60000).toInt()
+                            val hours = minutes / 60
+                            val mins = minutes % 60
+                            "${levelWithProgress.wordCount}語 - 残り${hours}時間${mins}分"
+                        } else {
+                            "${levelWithProgress.wordCount}語 - テスト解放 ${levelWithProgress.studiedCount}/${levelWithProgress.wordCount}"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 Text(
-                    text = levelWithProgress.level.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
+                    text = "${levelWithProgress.progressPercent}%",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
                     color = if (isLocked) {
                         MaterialTheme.colorScheme.onSurfaceVariant
+                    } else if (levelWithProgress.isCompleted) {
+                        CorrectGreen
                     } else {
-                        MaterialTheme.colorScheme.onSurface
+                        MaterialTheme.colorScheme.primary
                     }
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = if (isLocked) {
-                        "${levelWithProgress.wordCount}語 - 広告視聴でアンロック"
-                    } else if (levelWithProgress.remainingUnlockTimeMs > 0) {
-                        val minutes = (levelWithProgress.remainingUnlockTimeMs / 60000).toInt()
-                        val hours = minutes / 60
-                        val mins = minutes % 60
-                        "${levelWithProgress.wordCount}語 - 残り${hours}時間${mins}分"
-                    } else {
-                        "${levelWithProgress.wordCount}語"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            // Progress
-            Text(
-                text = "${levelWithProgress.progressPercent}%",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (isLocked) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else if (levelWithProgress.isCompleted) {
+            // Progress bar (full width, thin)
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { progressFraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp)),
+                color = if (levelWithProgress.isCompleted) {
                     CorrectGreen
                 } else {
                     MaterialTheme.colorScheme.primary
-                }
+                },
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
 
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // Word list button or unlock button
-            if (isLocked) {
-                TextButton(onClick = onUnlockClick) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "広告で解除",
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "広告で解除",
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
-            } else {
-                TextButton(onClick = onWordListClick) {
-                    Text(
-                        text = "単語一覧",
-                        style = MaterialTheme.typography.labelSmall
-                    )
+            // Row 2: Action buttons (right-aligned)
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isLocked) {
+                    TextButton(onClick = onUnlockClick) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = "広告で解除",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "広告で解除",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                } else {
+                    TextButton(onClick = onWordListClick) {
+                        Icon(
+                            imageVector = Icons.Default.MenuBook,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "単語一覧",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = onUnitTestClick,
+                        enabled = levelWithProgress.isTestUnlocked
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Quiz,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (levelWithProgress.isTestUnlocked) "テスト" else "テスト未解放",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
                 }
             }
         }
@@ -635,16 +802,16 @@ private fun ChildLevelCard(
 private fun EmptyLevelsContent() {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(AppDimens.RadiusXl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.ElevationNone)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(32.dp),
+                .padding(AppDimens.Spacing3xl),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
@@ -671,46 +838,6 @@ private fun EmptyLevelsContent() {
 }
 
 
-@Composable
-private fun LoadingContent() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator()
-    }
-}
-
-@Composable
-private fun ErrorContent(
-    error: String,
-    onRetry: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "エラーが発生しました",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = error,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        TextButton(onClick = onRetry) {
-            Text("再試行")
-        }
-    }
-}
 
 @Composable
 private fun DeleteLevelDialog(
@@ -805,8 +932,10 @@ private fun UnlockUnitDialog(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onPremiumClick() },
+                    shape = RoundedCornerShape(AppDimens.RadiusMd),
                     color = PremiumGold.copy(alpha = 0.1f)
                 ) {
                     Row(
@@ -822,7 +951,8 @@ private fun UnlockUnitDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "プレミアムで全ユニット永久アンロック",
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
+                            color = PremiumGold
                         )
                     }
                 }
@@ -848,16 +978,8 @@ private fun UnlockUnitDialog(
             }
         },
         dismissButton = {
-            Row {
-                TextButton(onClick = onPremiumClick) {
-                    Text(
-                        text = "プレミアム",
-                        color = PremiumGold
-                    )
-                }
-                TextButton(onClick = onDismiss) {
-                    Text("キャンセル")
-                }
+            TextButton(onClick = onDismiss) {
+                Text("キャンセル")
             }
         }
     )
@@ -902,6 +1024,7 @@ private fun HomeScreenPreview() {
             ),
             listState = rememberLazyListState(),
             onLevelClick = {},
+            onUnitTestClick = {},
             onWordListClick = {},
             onDeleteClick = {},
             onPremiumClick = {},
@@ -925,6 +1048,7 @@ private fun HomeScreenEmptyPreview() {
             ),
             listState = rememberLazyListState(),
             onLevelClick = {},
+            onUnitTestClick = {},
             onWordListClick = {},
             onDeleteClick = {},
             onPremiumClick = {},

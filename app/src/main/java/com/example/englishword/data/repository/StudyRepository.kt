@@ -485,6 +485,28 @@ class StudyRepository @Inject constructor(
             }
     }
 
+    /**
+     * Get count of words remembered on first attempt (new words remembered).
+     */
+    fun getKnownNewWordCount(): Flow<Int> {
+        return studyRecordDao.getKnownNewWordCount()
+            .catch { e ->
+                Log.e(TAG, "getKnownNewWordCount failed", e)
+                emit(0)
+            }
+    }
+
+    /**
+     * Get count of distinct words remembered after at least one prior attempt (review words remembered).
+     */
+    fun getKnownReviewWordCount(): Flow<Int> {
+        return studyRecordDao.getKnownReviewWordCount()
+            .catch { e ->
+                Log.e(TAG, "getKnownReviewWordCount failed", e)
+                emit(0)
+            }
+    }
+
     // ==================== Session Statistics ====================
 
     /**

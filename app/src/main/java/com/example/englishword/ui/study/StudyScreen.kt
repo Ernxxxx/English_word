@@ -1,8 +1,7 @@
 package com.example.englishword.ui.study
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,19 +17,30 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.FiberNew
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.activity.compose.BackHandler
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
@@ -51,8 +61,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.englishword.data.local.entity.Word
 import com.example.englishword.ui.components.EvaluationButtons
 import com.example.englishword.ui.components.FlashCard
+import com.example.englishword.ui.components.LoadingContent
+import com.example.englishword.ui.components.ErrorContent
 import com.example.englishword.ui.quiz.QuizContent
 import com.example.englishword.ui.quiz.QuizOptions
+import com.example.englishword.ui.theme.AppDimens
 import com.example.englishword.ui.theme.EnglishWordTheme
 import com.example.englishword.ui.theme.MasteryLevel1
 import com.example.englishword.ui.theme.MasteryLevel2
@@ -66,6 +79,7 @@ import com.example.englishword.util.SrsCalculator
  * Displays flash cards and handles user evaluation.
  */
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun StudyScreen(
     levelId: Long,
     onNavigateToResult: (Long) -> Unit,
@@ -79,6 +93,12 @@ fun StudyScreen(
     var showBackConfirmDialog by remember { mutableStateOf(false) }
     var hasEnteredStudyInThisScreen by remember(levelId) { mutableStateOf(false) }
     var showModeDialog by remember(levelId) { mutableStateOf(true) }
+    var selectedMode by remember(levelId) { mutableStateOf(StudyWordMode.AUTO) }
+    var modeCounts by remember(levelId) { mutableStateOf(StudyModeCounts()) }
+
+    LaunchedEffect(levelId) {
+        modeCounts = viewModel.getModeCounts(levelId)
+    }
 
     fun startStudy(mode: StudyWordMode) {
         hasEnteredStudyInThisScreen = false
@@ -113,40 +133,18 @@ fun StudyScreen(
     }
 
     if (showModeDialog) {
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text("学習モードを選択") },
-            text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Button(
-                        onClick = { startStudy(StudyWordMode.AUTO) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("おまかせ（復習優先）")
-                    }
-                    Button(
-                        onClick = { startStudy(StudyWordMode.REVIEW_ONLY) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("復習のみ")
-                    }
-                    Button(
-                        onClick = { startStudy(StudyWordMode.NEW_ONLY) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("新規のみ")
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = onNavigateBack) {
-                    Text("戻る")
-                }
-            }
-        )
+        ModalBottomSheet(
+            onDismissRequest = onNavigateBack,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            StudyModeSelectionSheet(
+                selectedMode = selectedMode,
+                modeCounts = modeCounts,
+                onSelectMode = { selectedMode = it },
+                onStart = { startStudy(selectedMode) },
+                onNavigateBack = onNavigateBack
+            )
+        }
     }
 
     // Ignore stale Completed state from a previous session and navigate only after this screen entered Studying.
@@ -176,6 +174,163 @@ fun StudyScreen(
         isTtsSpeaking = isTtsSpeaking,
         modifier = modifier
     )
+}
+
+@Composable
+private fun StudyModeSelectionSheet(
+    selectedMode: StudyWordMode,
+    modeCounts: StudyModeCounts,
+    onSelectMode: (StudyWordMode) -> Unit,
+    onStart: () -> Unit,
+    onNavigateBack: () -> Unit
+) {
+    val selectedCount = when (selectedMode) {
+        StudyWordMode.AUTO -> modeCounts.autoCount
+        StudyWordMode.REVIEW_ONLY -> modeCounts.reviewCount
+        StudyWordMode.NEW_ONLY -> modeCounts.newCount
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = AppDimens.SpacingXl, vertical = AppDimens.SpacingSm),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "学習モードを選択",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        ModeCard(
+            icon = Icons.Default.AutoAwesome,
+            title = "おまかせ",
+            description = "復習対象を優先し、不足分を新規で補います",
+            count = modeCounts.autoCount,
+            isSelected = selectedMode == StudyWordMode.AUTO,
+            onClick = { onSelectMode(StudyWordMode.AUTO) }
+        )
+        ModeCard(
+            icon = Icons.Default.Replay,
+            title = "復習のみ",
+            description = "期限到来の復習単語だけを出題します",
+            count = modeCounts.reviewCount,
+            isSelected = selectedMode == StudyWordMode.REVIEW_ONLY,
+            onClick = { onSelectMode(StudyWordMode.REVIEW_ONLY) }
+        )
+        ModeCard(
+            icon = Icons.Default.FiberNew,
+            title = "新規のみ",
+            description = "まだ学習していない新規単語だけを出題します",
+            count = modeCounts.newCount,
+            isSelected = selectedMode == StudyWordMode.NEW_ONLY,
+            onClick = { onSelectMode(StudyWordMode.NEW_ONLY) }
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Button(
+            onClick = onStart,
+            enabled = selectedCount > 0,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(AppDimens.RadiusLg)
+        ) {
+            Text(
+                text = if (selectedCount > 0) "${selectedCount}語で開始" else "対象の単語がありません",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        TextButton(
+            onClick = onNavigateBack,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ) {
+            Text("戻る")
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun ModeCard(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    count: Int,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val borderColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
+    val containerColor = if (isSelected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
+    OutlinedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AppDimens.RadiusLg))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(AppDimens.RadiusLg),
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = borderColor
+        ),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = containerColor
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AppDimens.SpacingLg),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+                tint = if (isSelected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = "${count}語",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (isSelected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
+    }
 }
 
 /**
@@ -214,7 +369,7 @@ private fun StudyScreenContent(
         ) {
             when (uiState) {
                 is StudyUiState.Loading -> {
-                    LoadingContent()
+                    LoadingContent(message = "単語を読み込み中...")
                 }
                 is StudyUiState.Studying -> {
                     StudyingContent(
@@ -268,10 +423,7 @@ private fun StudyTopAppBar(
                         // Animated progress indicator
                         val progress by animateFloatAsState(
                             targetValue = uiState.progress.toFloat() / uiState.totalCount,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessLow
-                            ),
+                            animationSpec = tween(durationMillis = 300),
                             label = "progressAnimation"
                         )
 
@@ -308,32 +460,6 @@ private fun StudyTopAppBar(
     )
 }
 
-/**
- * Loading state content.
- */
-@Composable
-private fun LoadingContent() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(48.dp),
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "単語を読み込み中...",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
 
 /**
  * Active studying content with flash card and evaluation buttons,
@@ -358,7 +484,7 @@ private fun StudyingContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(AppDimens.SpacingLg)
         ) {
             // Mastery info row (same as flashcard mode)
             MasteryInfoRow(currentWord = currentWord)
@@ -383,7 +509,7 @@ private fun StudyingContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(AppDimens.SpacingLg)
     ) {
         // Mastery info row
         MasteryInfoRow(currentWord = currentWord)
@@ -443,7 +569,7 @@ private fun MasteryInfoRow(currentWord: Word) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 8.dp),
+            .padding(bottom = AppDimens.SpacingSm),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -492,7 +618,7 @@ private fun SpeakButton(
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(AppDimens.RadiusLg),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -514,33 +640,6 @@ private fun SpeakButton(
     }
 }
 
-/**
- * Error state content.
- */
-@Composable
-private fun ErrorContent(message: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "エラー",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.error
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
 
 @Preview(showBackground = true)
 @Composable

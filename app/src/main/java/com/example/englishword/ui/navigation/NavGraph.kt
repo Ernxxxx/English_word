@@ -17,14 +17,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.englishword.ui.home.HomeScreen
 import com.example.englishword.ui.onboarding.OnboardingScreen
 import com.example.englishword.ui.settings.PremiumScreen
-import com.example.englishword.ui.settings.SettingsScreen
-import com.example.englishword.ui.stats.StatsScreen
 import com.example.englishword.ui.study.StudyResultScreen
 import com.example.englishword.ui.study.StudyScreen
 import com.example.englishword.ui.study.StudyViewModel
+import com.example.englishword.ui.test.UnitTestScreen
 import com.example.englishword.ui.word.WordEditScreen
 import com.example.englishword.ui.word.WordListScreen
 
@@ -35,6 +33,7 @@ object Routes {
     const val ONBOARDING = "onboarding"
     const val HOME = "home"
     const val STUDY = "study/{levelId}"
+    const val UNIT_TEST = "unitTest/{levelId}"
     const val STUDY_RESULT = "studyResult/{sessionId}"
     const val WORD_LIST = "wordList/{levelId}"
     const val WORD_EDIT = "wordEdit/{levelId}?wordId={wordId}"
@@ -44,6 +43,7 @@ object Routes {
 
     // Helper functions to create routes with arguments
     fun study(levelId: Long): String = "study/$levelId"
+    fun unitTest(levelId: Long): String = "unitTest/$levelId"
     fun studyResult(sessionId: Long): String = "studyResult/$sessionId"
     fun wordList(levelId: Long): String = "wordList/$levelId"
     fun wordEdit(levelId: Long, wordId: Long? = null): String {
@@ -93,7 +93,7 @@ fun EnglishWordNavHost(
             )
         }
 
-        // Home screen
+        // Home screen (MainShellScreen with bottom navigation)
         composable(
             route = Routes.HOME,
             enterTransition = { fadeIn(tween(300)) },
@@ -101,21 +101,18 @@ fun EnglishWordNavHost(
             popEnterTransition = { slideInHorizontally(tween(300)) { -it / 3 } + fadeIn(tween(300)) },
             popExitTransition = { fadeOut(tween(300)) }
         ) {
-            HomeScreen(
+            MainShellScreen(
                 onNavigateToStudy = { levelId ->
                     navController.navigate(Routes.study(levelId))
+                },
+                onNavigateToUnitTest = { levelId ->
+                    navController.navigate(Routes.unitTest(levelId))
                 },
                 onNavigateToWordList = { levelId ->
                     navController.navigate(Routes.wordList(levelId))
                 },
-                onNavigateToSettings = {
-                    navController.navigate(Routes.SETTINGS)
-                },
                 onNavigateToPremium = {
                     navController.navigate(Routes.PREMIUM)
-                },
-                onNavigateToStats = {
-                    navController.navigate(Routes.STATS)
                 }
             )
         }
@@ -149,6 +146,28 @@ fun EnglishWordNavHost(
                     navController.popBackStack()
                 },
                 viewModel = studyViewModel
+            )
+        }
+
+        // Unit test screen
+        composable(
+            route = Routes.UNIT_TEST,
+            enterTransition = { slideInHorizontally(tween(300)) { it } + fadeIn(tween(300)) },
+            exitTransition = { slideOutHorizontally(tween(300)) { -it / 3 } + fadeOut(tween(150)) },
+            popEnterTransition = { slideInHorizontally(tween(300)) { -it / 3 } + fadeIn(tween(300)) },
+            popExitTransition = { slideOutHorizontally(tween(300)) { it } + fadeOut(tween(150)) },
+            arguments = listOf(
+                navArgument(NavArgs.LEVEL_ID) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val levelId = backStackEntry.arguments?.getLong(NavArgs.LEVEL_ID) ?: 0L
+            UnitTestScreen(
+                levelId = levelId,
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
             )
         }
 
@@ -242,24 +261,6 @@ fun EnglishWordNavHost(
             )
         }
 
-        // Settings screen
-        composable(
-            route = Routes.SETTINGS,
-            enterTransition = { slideInVertically(tween(300)) { it / 2 } + fadeIn(tween(300)) },
-            exitTransition = { fadeOut(tween(150)) },
-            popEnterTransition = { fadeIn(tween(300)) },
-            popExitTransition = { slideOutVertically(tween(300)) { it / 2 } + fadeOut(tween(150)) }
-        ) {
-            SettingsScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
-                onNavigateToPremium = {
-                    navController.navigate(Routes.PREMIUM)
-                }
-            )
-        }
-
         // Premium screen
         composable(
             route = Routes.PREMIUM,
@@ -275,19 +276,6 @@ fun EnglishWordNavHost(
             )
         }
 
-        // Stats screen
-        composable(
-            route = Routes.STATS,
-            enterTransition = { slideInHorizontally(tween(300)) { it } + fadeIn(tween(300)) },
-            exitTransition = { slideOutHorizontally(tween(300)) { -it / 3 } + fadeOut(tween(150)) },
-            popEnterTransition = { slideInHorizontally(tween(300)) { -it / 3 } + fadeIn(tween(300)) },
-            popExitTransition = { slideOutHorizontally(tween(300)) { it } + fadeOut(tween(150)) }
-        ) {
-            StatsScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                }
-            )
-        }
+        // Note: Stats and Settings screens are now embedded in MainShellScreen's bottom tabs
     }
 }
