@@ -8,7 +8,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -112,7 +111,9 @@ fun EnglishWordNavHost(
                     navController.navigate(Routes.wordList(levelId))
                 },
                 onNavigateToPremium = {
-                    navController.navigate(Routes.PREMIUM)
+                    navController.navigate(Routes.PREMIUM) {
+                        launchSingleTop = true
+                    }
                 }
             )
         }
@@ -131,10 +132,7 @@ fun EnglishWordNavHost(
             )
         ) { backStackEntry ->
             val levelId = backStackEntry.arguments?.getLong(NavArgs.LEVEL_ID) ?: 0L
-            val homeBackStackEntry = remember(backStackEntry) {
-                navController.getBackStackEntry(Routes.HOME)
-            }
-            val studyViewModel: StudyViewModel = hiltViewModel(homeBackStackEntry)
+            val studyViewModel: StudyViewModel = hiltViewModel()
             StudyScreen(
                 levelId = levelId,
                 onNavigateToResult = { sessionId ->
@@ -185,16 +183,13 @@ fun EnglishWordNavHost(
             )
         ) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getLong(NavArgs.SESSION_ID) ?: 0L
-            val homeBackStackEntry = remember(backStackEntry) {
-                navController.getBackStackEntry(Routes.HOME)
-            }
-            val studyViewModel: StudyViewModel = hiltViewModel(homeBackStackEntry)
+            val studyViewModel: StudyViewModel = hiltViewModel()
             StudyResultScreen(
                 sessionId = sessionId,
                 onNavigateToHome = {
                     // Clear entire back stack and navigate to HOME
                     navController.navigate(Routes.HOME) {
-                        popUpTo(0) { inclusive = true }
+                        popUpTo(navController.graph.id) { inclusive = true }
                         launchSingleTop = true
                     }
                 },

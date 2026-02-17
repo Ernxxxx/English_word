@@ -1,6 +1,8 @@
 package com.example.englishword.data.repository
 
 import android.util.Log
+import androidx.room.withTransaction
+import com.example.englishword.data.local.AppDatabase
 import com.example.englishword.data.local.dao.LevelWordStats
 import com.example.englishword.data.local.dao.MasteryCount
 import com.example.englishword.data.local.dao.WordDao
@@ -19,6 +21,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class WordRepository @Inject constructor(
+    private val database: AppDatabase,
     private val wordDao: WordDao
 ) {
 
@@ -424,19 +427,25 @@ class WordRepository @Inject constructor(
      */
     suspend fun updateMastery(wordId: Long, result: ReviewResult): Boolean {
         return try {
-            val word = wordDao.getWordByIdSync(wordId) ?: return false
+            database.withTransaction {
+                val word = wordDao.getWordByIdSync(wordId)
+                    ?: throw IllegalStateException("Word not found: $wordId")
 
-            val (newMasteryLevel, nextReviewAt) = SrsCalculator.calculateNextReview(
-                currentLevel = word.masteryLevel,
-                result = result
-            )
+                val (newMasteryLevel, nextReviewAt) = SrsCalculator.calculateNextReview(
+                    currentLevel = word.masteryLevel,
+                    result = result
+                )
 
-            wordDao.updateMastery(
-                wordId = wordId,
-                masteryLevel = newMasteryLevel,
-                nextReviewAt = nextReviewAt
-            )
+                wordDao.updateMastery(
+                    wordId = wordId,
+                    masteryLevel = newMasteryLevel,
+                    nextReviewAt = nextReviewAt
+                )
+            }
             true
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "updateMastery: ${e.message}")
+            false
         } catch (e: Exception) {
             Log.e(TAG, "updateMastery failed", e)
             false
@@ -482,17 +491,7 @@ class WordRepository @Inject constructor(
      */
     suspend fun resetLevelProgress(levelId: Long): Boolean {
         return try {
-            val words = wordDao.getWordsByLevelSync(levelId)
-            words.forEach { word ->
-                wordDao.update(
-                    word.copy(
-                        masteryLevel = 0,
-                        nextReviewAt = null,
-                        reviewCount = 0,
-                        updatedAt = System.currentTimeMillis()
-                    )
-                )
-            }
+            wordDao.resetWordsForLevel(levelId)
             true
         } catch (e: Exception) {
             Log.e(TAG, "resetLevelProgress failed", e)
@@ -582,7 +581,7 @@ class WordRepository @Inject constructor(
                 )
             }
             val ids = wordDao.insertAll(words)
-            ids.size
+            ids.count { it != -1L }
         } catch (e: Exception) {
             Log.e(TAG, "importWords failed", e)
             0

@@ -47,25 +47,25 @@ data class LevelWithProgress(
      * Gets the mastered progress as a fraction (0.0 to 1.0).
      */
     val masteredFraction: Float
-        get() = if (wordCount == 0) 0f else masteredCount.toFloat() / wordCount
+        get() = if (wordCount == 0) 0f else (masteredCount.toFloat() / wordCount).coerceIn(0f, 1f)
 
     /**
      * Gets the in-progress (learning) fraction (0.0 to 1.0).
      */
     val inProgressFraction: Float
-        get() = if (wordCount == 0) 0f else inProgressCount.toFloat() / wordCount
+        get() = if (wordCount == 0) 0f else (inProgressCount.toFloat() / wordCount).coerceIn(0f, 1f)
 
     /**
      * Gets the total progress fraction (mastered + in-progress).
      */
     val progressFraction: Float
-        get() = if (wordCount == 0) 0f else (masteredCount + inProgressCount).toFloat() / wordCount
+        get() = if (wordCount == 0) 0f else ((masteredCount + inProgressCount).toFloat() / wordCount).coerceIn(0f, 1f)
 
     /**
      * Gets the total progress as a percentage (0-100).
      */
     val progressPercent: Int
-        get() = if (wordCount == 0) 0 else ((masteredCount + inProgressCount) * 100) / wordCount
+        get() = if (wordCount == 0) 0 else (((masteredCount + inProgressCount) * 100) / wordCount).coerceIn(0, 100)
 
     /**
      * Gets the number of words not yet started (mastery = 0).
@@ -198,11 +198,11 @@ data class ParentLevelWithChildren(
      * Combined progress fraction (mastered + in-progress, matching child level calculation).
      */
     val progressFraction: Float
-        get() = if (totalWordCount == 0) 0f else (totalMasteredCount + totalInProgressCount).toFloat() / totalWordCount
+        get() = if (totalWordCount == 0) 0f else ((totalMasteredCount + totalInProgressCount).toFloat() / totalWordCount).coerceIn(0f, 1f)
 
     /**
      * Combined progress percentage (mastered + in-progress, matching child level calculation).
      */
     val progressPercent: Int
-        get() = if (totalWordCount == 0) 0 else ((totalMasteredCount + totalInProgressCount) * 100) / totalWordCount
+        get() = if (totalWordCount == 0) 0 else (((totalMasteredCount + totalInProgressCount) * 100) / totalWordCount).coerceIn(0, 100)
 }

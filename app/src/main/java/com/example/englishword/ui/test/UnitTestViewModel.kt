@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 
 data class UnitTestUiState(
@@ -140,8 +141,8 @@ class UnitTestViewModel @Inject constructor(
             )
         }
 
-        if (correct) {
-            viewModelScope.launch {
+        if (correct && !currentWord.isAcquired) {
+            viewModelScope.launch(NonCancellable) {
                 wordRepository.markWordAcquired(currentWord.id)
             }
         }
@@ -153,7 +154,7 @@ class UnitTestViewModel @Inject constructor(
 
         val nextIndex = state.currentIndex + 1
         if (nextIndex >= state.words.size) {
-            _uiState.update { it.copy(isCompleted = true) }
+            _uiState.update { it.copy(isCompleted = true, error = null) }
             return
         }
 

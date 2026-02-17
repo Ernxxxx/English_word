@@ -1,5 +1,6 @@
 package com.example.englishword.ui.navigation
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -79,7 +80,7 @@ fun MainShellScreen(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val currentTab = ShellTab.entries[selectedTab]
+    val currentTab = ShellTab.entries.getOrElse(selectedTab) { ShellTab.entries.first() }
     val isPremium by shellViewModel.isPremium.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -113,7 +114,7 @@ fun MainShellScreen(
             Column {
                 if (!isPremium) {
                     SimpleBannerAdView(
-                        isPremium = false
+                        isPremium = isPremium
                     )
                 }
                 NavigationBar {
@@ -130,22 +131,27 @@ fun MainShellScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        when (currentTab) {
-            ShellTab.HOME -> HomeTab(
-                onNavigateToStudy = onNavigateToStudy,
-                onNavigateToUnitTest = onNavigateToUnitTest,
-                onNavigateToWordList = onNavigateToWordList,
-                onNavigateToPremium = onNavigateToPremium,
-                modifier = Modifier.padding(paddingValues)
-            )
-            ShellTab.STATS -> StatsTab(
-                modifier = Modifier.padding(paddingValues)
-            )
-            ShellTab.SETTINGS -> SettingsTab(
-                onNavigateToPremium = onNavigateToPremium,
-                snackbarHostState = snackbarHostState,
-                modifier = Modifier.padding(paddingValues)
-            )
+        // Crossfade provides animated transition between tabs.
+        // Note: For true state preservation across tab switches, consider
+        // using SaveableStateHolder or NavHost with bottom nav integration.
+        Crossfade(targetState = currentTab, label = "tab_crossfade") { tab ->
+            when (tab) {
+                ShellTab.HOME -> HomeTab(
+                    onNavigateToStudy = onNavigateToStudy,
+                    onNavigateToUnitTest = onNavigateToUnitTest,
+                    onNavigateToWordList = onNavigateToWordList,
+                    onNavigateToPremium = onNavigateToPremium,
+                    modifier = Modifier.padding(paddingValues)
+                )
+                ShellTab.STATS -> StatsTab(
+                    modifier = Modifier.padding(paddingValues)
+                )
+                ShellTab.SETTINGS -> SettingsTab(
+                    onNavigateToPremium = onNavigateToPremium,
+                    snackbarHostState = snackbarHostState,
+                    modifier = Modifier.padding(paddingValues)
+                )
+            }
         }
     }
 }

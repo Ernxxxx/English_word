@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -92,6 +93,7 @@ class StatsViewModel @Inject constructor(
     companion object {
         private const val TAG = "StatsViewModel"
         private const val WEEKLY_DAYS = 7
+        /** Last N days for heatmap display (not calendar month). */
         private const val MONTHLY_DAYS = 30
 
         /** Human-readable labels for the 3 mastery categories. */
@@ -107,6 +109,8 @@ class StatsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(StatsUiState())
     val uiState: StateFlow<StatsUiState> = _uiState.asStateFlow()
 
+    private var loadJob: Job? = null
+
     init {
         loadStats()
     }
@@ -117,7 +121,8 @@ class StatsViewModel @Inject constructor(
      * average daily) with one-shot suspend calls (streaks, mastery distribution, recent stats).
      */
     private fun loadStats() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
@@ -220,7 +225,9 @@ class StatsViewModel @Inject constructor(
 
         val notStarted = countMap[0] ?: 0
         val learning = (1 until SrsCalculator.MAX_LEVEL).sumOf { countMap[it] ?: 0 }
-        val mastered = countMap[SrsCalculator.MAX_LEVEL] ?: 0
+        val mastered = countMap.entries
+            .filter { it.key >= SrsCalculator.MAX_LEVEL }
+            .sumOf { it.value }
 
         return listOf(
             MasteryLevel(level = 0, count = notStarted, label = CATEGORY_LABELS[0]),

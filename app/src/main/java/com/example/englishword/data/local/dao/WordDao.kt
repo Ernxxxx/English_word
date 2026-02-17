@@ -267,4 +267,18 @@ interface WordDao {
         maxMasteryLevel: Int,
         updatedAt: Long = System.currentTimeMillis()
     ): Int
+
+    // Bulk reset progress for all words in a level (single UPDATE, no N+1)
+    @Query("""
+        UPDATE words
+        SET masteryLevel = 0,
+            nextReviewAt = NULL,
+            reviewCount = 0,
+            updatedAt = :updatedAt
+        WHERE levelId = :levelId
+    """)
+    suspend fun resetWordsForLevel(
+        levelId: Long,
+        updatedAt: Long = System.currentTimeMillis()
+    )
 }

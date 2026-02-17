@@ -546,6 +546,28 @@ fun MasteryDonutChart(
     val centerLargeTextSizePx = with(density) { 22.sp.toPx() }
     val centerSmallTextSizePx = with(density) { 11.sp.toPx() }
 
+    // Pre-create Paint objects outside draw lambda to avoid per-frame allocation (Issue #17)
+    val countPaint = remember(onSurfaceColor, centerLargeTextSizePx) {
+        android.graphics.Paint().apply {
+            color = onSurfaceColor.toArgb()
+            textSize = centerLargeTextSizePx
+            textAlign = android.graphics.Paint.Align.CENTER
+            isAntiAlias = true
+            typeface = android.graphics.Typeface.create(
+                android.graphics.Typeface.DEFAULT,
+                android.graphics.Typeface.BOLD
+            )
+        }
+    }
+    val labelPaint = remember(onSurfaceVariantColor, centerSmallTextSizePx) {
+        android.graphics.Paint().apply {
+            color = onSurfaceVariantColor.copy(alpha = 0.6f).toArgb()
+            textSize = centerSmallTextSizePx
+            textAlign = android.graphics.Paint.Align.CENTER
+            isAntiAlias = true
+        }
+    }
+
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -583,8 +605,9 @@ fun MasteryDonutChart(
                 for (entry in distribution) {
                     if (entry.count == 0) continue
 
-                    val sweepAngle = (entry.count.toFloat() / totalWords * 360f - gapAngle)
-                        .coerceAtLeast(0f) * animationProgress.value
+                    val rawSweep = entry.count.toFloat() / totalWords * 360f
+                    val sweepAngle = (if (rawSweep > gapAngle * 2) rawSweep - gapAngle else rawSweep) *
+                        animationProgress.value
                     val colorIndex = entry.level.coerceIn(0, MasteryColors.lastIndex)
 
                     drawArc(
@@ -604,18 +627,8 @@ fun MasteryDonutChart(
                 }
             }
 
-            // Center text: total count
+            // Center text: total count (using pre-created Paint objects)
             drawContext.canvas.nativeCanvas.apply {
-                val countPaint = android.graphics.Paint().apply {
-                    color = onSurfaceColor.toArgb()
-                    textSize = centerLargeTextSizePx
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    isAntiAlias = true
-                    typeface = android.graphics.Typeface.create(
-                        android.graphics.Typeface.DEFAULT,
-                        android.graphics.Typeface.BOLD
-                    )
-                }
                 drawText(
                     totalWords.toString(),
                     center.x,
@@ -623,12 +636,6 @@ fun MasteryDonutChart(
                     countPaint
                 )
 
-                val labelPaint = android.graphics.Paint().apply {
-                    color = onSurfaceVariantColor.copy(alpha = 0.6f).toArgb()
-                    textSize = centerSmallTextSizePx
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    isAntiAlias = true
-                }
                 drawText(
                     "語",
                     center.x,
