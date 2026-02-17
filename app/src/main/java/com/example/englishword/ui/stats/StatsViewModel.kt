@@ -124,6 +124,29 @@ class StatsViewModel @Inject constructor(
     /** Max months back for heatmap navigation. */
     private val maxMonthBack = -2
 
+    /** Internal snapshot from combine lambda (data fields only, no dialog state). */
+    private data class DataSnapshot(
+        val weeklyData: List<DailyStudyData>,
+        val monthlyData: List<DailyStudyData>,
+        val weekOffset: Int,
+        val weekLabel: String,
+        val canGoBackWeek: Boolean,
+        val canGoForwardWeek: Boolean,
+        val monthOffset: Int,
+        val canGoBackMonth: Boolean,
+        val canGoForwardMonth: Boolean,
+        val currentStreak: Int,
+        val maxStreak: Int,
+        val totalWordsStudied: Int,
+        val totalWordsMastered: Int,
+        val totalWordsAcquired: Int,
+        val rememberedNewWords: Int,
+        val rememberedReviewWords: Int,
+        val totalWords: Int,
+        val averageDaily: Float,
+        val masteryDistribution: List<MasteryLevel>
+    )
+
     init {
         loadStats()
     }
@@ -195,7 +218,8 @@ class StatsViewModel @Inject constructor(
 
                     val currentMonthOffset = _uiState.value.monthOffset
 
-                    StatsUiState(
+                    // Return a data-only tuple; actual state merge happens in collect
+                    DataSnapshot(
                         weeklyData = weeklyData,
                         monthlyData = monthlyData,
                         weekOffset = currentOffset,
@@ -214,12 +238,34 @@ class StatsViewModel @Inject constructor(
                         rememberedReviewWords = rememberedReviewWords,
                         totalWords = totalWords,
                         averageDaily = averageDaily,
-                        masteryDistribution = masteryDistribution,
-                        isLoading = false,
-                        error = null
+                        masteryDistribution = masteryDistribution
                     )
-                }.collect { state ->
-                    _uiState.value = state
+                }.collect { snapshot ->
+                    _uiState.update { current ->
+                        current.copy(
+                            weeklyData = snapshot.weeklyData,
+                            monthlyData = snapshot.monthlyData,
+                            weekOffset = snapshot.weekOffset,
+                            weekLabel = snapshot.weekLabel,
+                            canGoBackWeek = snapshot.canGoBackWeek,
+                            canGoForwardWeek = snapshot.canGoForwardWeek,
+                            monthOffset = snapshot.monthOffset,
+                            canGoBackMonth = snapshot.canGoBackMonth,
+                            canGoForwardMonth = snapshot.canGoForwardMonth,
+                            currentStreak = snapshot.currentStreak,
+                            maxStreak = snapshot.maxStreak,
+                            totalWordsStudied = snapshot.totalWordsStudied,
+                            totalWordsMastered = snapshot.totalWordsMastered,
+                            totalWordsAcquired = snapshot.totalWordsAcquired,
+                            rememberedNewWords = snapshot.rememberedNewWords,
+                            rememberedReviewWords = snapshot.rememberedReviewWords,
+                            totalWords = snapshot.totalWords,
+                            averageDaily = snapshot.averageDaily,
+                            masteryDistribution = snapshot.masteryDistribution,
+                            isLoading = false,
+                            error = null
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "loadStats failed", e)

@@ -273,6 +273,8 @@ fun StatsScreen(
                     onMasteredCardClick = { viewModel.showMasteredWordsDialog() },
                     onTodayCardClick = { viewModel.showTodayWordsDialog() },
                     onSrsHelpClick = { viewModel.showSrsExplanation() },
+                    onShiftWeek = { viewModel.shiftWeek(it) },
+                    onShiftMonth = { viewModel.shiftMonth(it) },
                     modifier = Modifier.padding(paddingValues)
                 )
             }

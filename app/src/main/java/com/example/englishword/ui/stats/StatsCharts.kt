@@ -107,7 +107,7 @@ fun WeeklyBarChart(
     // Derive day labels and today-index from actual data dates
     val todayStr = remember { LocalDate.now().format(chartDateFormatter) }
     val todayIndex = remember(data) {
-        data.indexOfFirst { it.date == todayStr }.takeIf { it >= 0 } ?: (data.size - 1)
+        data.indexOfFirst { it.date == todayStr }
     }
     val dayLabels = remember(data) {
         data.map { entry ->
@@ -321,7 +321,7 @@ fun MonthlyHeatmap(
 
     // Animation
     val animationProgress = remember { Animatable(0f) }
-    LaunchedEffect(data) {
+    LaunchedEffect(data, targetDate) {
         animationProgress.snapTo(0f)
         animationProgress.animateTo(
             targetValue = 1f,
