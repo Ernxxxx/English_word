@@ -302,25 +302,16 @@ private val HeatmapGreen4 = Color(0xFF216E39)
 @Composable
 fun MonthlyHeatmap(
     data: List<DailyStudyData>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    targetDate: LocalDate = LocalDate.now()
 ) {
-    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val emptyColor = if (isDarkTheme) HeatmapEmptyDark else HeatmapEmptyLight
 
-    val now = remember { LocalDate.now() }
-    val monthLabel = remember(now) {
-        val monthNames = listOf(
-            "1月", "2月", "3月", "4月", "5月", "6月",
-            "7月", "8月", "9月", "10月", "11月", "12月"
-        )
-        "${now.year}年 ${monthNames[now.monthValue - 1]}"
-    }
-
     // Calculate grid: which weekday the 1st falls on, total days in month
-    val firstDayOfMonth = remember(now) { now.withDayOfMonth(1) }
-    val daysInMonth = remember(now) { now.lengthOfMonth() }
+    val firstDayOfMonth = remember(targetDate) { targetDate.withDayOfMonth(1) }
+    val daysInMonth = remember(targetDate) { targetDate.lengthOfMonth() }
     // DayOfWeek.MONDAY = 1 ... SUNDAY = 7, convert to 0-indexed (Mon=0)
     val startOffset = remember(firstDayOfMonth) { firstDayOfMonth.dayOfWeek.value - 1 }
 
@@ -339,19 +330,9 @@ fun MonthlyHeatmap(
     }
 
     val density = LocalDensity.current
-    val headerTextSizePx = with(density) { 14.sp.toPx() }
     val dayHeaderTextSizePx = with(density) { 10.sp.toPx() }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        // Month/Year header
-        Text(
-            text = monthLabel,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = onSurfaceColor,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
         // Dynamic height: 6 rows need more space than 5
         val totalRows = remember(startOffset, daysInMonth) {
             (startOffset + daysInMonth + 6) / 7

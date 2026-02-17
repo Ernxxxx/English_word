@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -56,9 +58,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.time.LocalDate
 import com.example.englishword.ui.theme.AppDimens
 import com.example.englishword.ui.theme.CorrectGreen
 import com.example.englishword.ui.theme.StreakOrange
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberModalBottomSheetState
 
 /**
  * Tab-friendly version of StatsScreen without Scaffold/TopAppBar.
@@ -97,6 +104,7 @@ fun StatsTab(
             title = "取得済みの単語",
             words = uiState.masteredWordsList,
             emptyMessage = "まだ取得済みの単語はありません",
+            accentColor = CorrectGreen,
             onDismiss = { viewModel.hideMasteredWordsDialog() }
         )
     }
@@ -107,6 +115,7 @@ fun StatsTab(
             title = "今日学習した単語",
             words = uiState.todayWordsList,
             emptyMessage = "今日はまだ学習していません",
+            accentColor = MaterialTheme.colorScheme.primary,
             onDismiss = { viewModel.hideTodayWordsDialog() }
         )
     }
@@ -141,6 +150,8 @@ fun StatsTab(
                 onMasteredCardClick = { viewModel.showMasteredWordsDialog() },
                 onTodayCardClick = { viewModel.showTodayWordsDialog() },
                 onSrsHelpClick = { viewModel.showSrsExplanation() },
+                onShiftWeek = { viewModel.shiftWeek(it) },
+                onShiftMonth = { viewModel.shiftMonth(it) },
                 modifier = modifier
             )
         }
@@ -188,6 +199,7 @@ fun StatsScreen(
             title = "取得済みの単語",
             words = uiState.masteredWordsList,
             emptyMessage = "まだ取得済みの単語はありません",
+            accentColor = CorrectGreen,
             onDismiss = { viewModel.hideMasteredWordsDialog() }
         )
     }
@@ -198,6 +210,7 @@ fun StatsScreen(
             title = "今日学習した単語",
             words = uiState.todayWordsList,
             emptyMessage = "今日はまだ学習していません",
+            accentColor = MaterialTheme.colorScheme.primary,
             onDismiss = { viewModel.hideTodayWordsDialog() }
         )
     }
@@ -306,6 +319,8 @@ private fun StatsContent(
     onMasteredCardClick: () -> Unit = {},
     onTodayCardClick: () -> Unit = {},
     onSrsHelpClick: () -> Unit = {},
+    onShiftWeek: (Int) -> Unit = {},
+    onShiftMonth: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -323,25 +338,165 @@ private fun StatsContent(
             )
         }
 
-        // Section 2: Weekly Study Chart
+        // Section 2: Weekly Study Chart (with week navigation)
         item {
-            StatsSection(title = "\u4eca\u9031\u306e\u5b66\u7fd2") {
-                WeeklyBarChart(
-                    data = uiState.weeklyData,
+            Column {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
-                )
+                        .padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { onShiftWeek(-1) },
+                        enabled = uiState.canGoBackWeek
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowLeft,
+                            contentDescription = "前の週",
+                            tint = if (uiState.canGoBackWeek)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = if (uiState.weekOffset == 0) "今週の学習" else "週間学習",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (uiState.weekLabel.isNotEmpty()) {
+                            Text(
+                                text = uiState.weekLabel,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { onShiftWeek(1) },
+                        enabled = uiState.canGoForwardWeek
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowRight,
+                            contentDescription = "次の週",
+                            tint = if (uiState.canGoForwardWeek)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        )
+                    }
+                }
+
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(AppDimens.RadiusXl),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = AppDimens.ElevationMedium),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        WeeklyBarChart(
+                            data = uiState.weeklyData,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                        )
+                    }
+                }
             }
         }
 
-        // Section 3: Monthly Heatmap
+        // Section 3: Monthly Heatmap (with month navigation)
         item {
-            StatsSection(title = "\u6708\u9593\u5b66\u7fd2\u30ab\u30ec\u30f3\u30c0\u30fc") {
-                MonthlyHeatmap(
-                    data = uiState.monthlyData,
-                    modifier = Modifier.fillMaxWidth()
-                )
+            val targetMonth = LocalDate.now().plusMonths(uiState.monthOffset.toLong())
+            val monthNames = listOf(
+                "1月", "2月", "3月", "4月", "5月", "6月",
+                "7月", "8月", "9月", "10月", "11月", "12月"
+            )
+            val monthLabel = "${targetMonth.year}年 ${monthNames[targetMonth.monthValue - 1]}"
+
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { onShiftMonth(-1) },
+                        enabled = uiState.canGoBackMonth
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowLeft,
+                            contentDescription = "前の月",
+                            tint = if (uiState.canGoBackMonth)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "学習カレンダー",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = monthLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { onShiftMonth(1) },
+                        enabled = uiState.canGoForwardMonth
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowRight,
+                            contentDescription = "次の月",
+                            tint = if (uiState.canGoForwardMonth)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        )
+                    }
+                }
+
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(AppDimens.RadiusXl),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = AppDimens.ElevationMedium),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        MonthlyHeatmap(
+                            data = uiState.monthlyData,
+                            modifier = Modifier.fillMaxWidth(),
+                            targetDate = targetMonth
+                        )
+                    }
+                }
             }
         }
 
@@ -573,92 +728,165 @@ private fun StatCard(
 }
 
 // ---------------------------------------------------------------------------
-// Word List Detail Dialog
+// Word List Detail Dialog (Modern BottomSheet)
 // ---------------------------------------------------------------------------
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WordListDialog(
     title: String,
     words: List<WordSummary>,
     emptyMessage: String,
+    accentColor: Color = MaterialTheme.colorScheme.primary,
     onDismiss: () -> Unit
 ) {
-    val masteryLabels = listOf("未学習", "学習中", "学習中", "学習中", "学習中", "習得済み")
-
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = {
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+        ) {
+            // Header
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(title)
                 Text(
-                    text = "${words.size}語",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
                 )
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = accentColor.copy(alpha = 0.12f)
+                ) {
+                    Text(
+                        text = "${words.size}語",
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accentColor
+                    )
+                }
             }
-        },
-        text = {
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             if (words.isEmpty()) {
+                // Empty state
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 24.dp),
+                        .padding(vertical = 48.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = emptyMessage,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.School,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = emptyMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.height(360.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     items(words) { word ->
-                        Column {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = word.english,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = word.japanese,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Text(
-                                    text = masteryLabels.getOrElse(word.masteryLevel) { "Lv${word.masteryLevel}" },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        }
+                        WordItemCard(word = word)
+                    }
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("閉じる")
+        }
+    }
+}
+
+@Composable
+private fun WordItemCard(word: WordSummary) {
+    val masteryInfo = getMasteryInfo(word.masteryLevel)
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Mastery color indicator
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(masteryInfo.color)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Word text
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = word.english,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = word.japanese,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Mastery badge
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = masteryInfo.color.copy(alpha = 0.12f)
+            ) {
+                Text(
+                    text = masteryInfo.label,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = masteryInfo.color
+                )
             }
         }
-    )
+    }
+}
+
+private data class MasteryInfo(val label: String, val color: Color)
+
+private fun getMasteryInfo(level: Int): MasteryInfo {
+    return when (level) {
+        0 -> MasteryInfo("未学習", Color(0xFF9E9E9E))
+        in 1..2 -> MasteryInfo("学習中", Color(0xFFFFA726))
+        in 3..4 -> MasteryInfo("定着中", Color(0xFF42A5F5))
+        else -> MasteryInfo("習得済み", Color(0xFF4CAF50))
+    }
 }
 
 // ---------------------------------------------------------------------------

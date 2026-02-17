@@ -58,6 +58,13 @@ data class WordSummary(
 data class StatsUiState(
     val weeklyData: List<DailyStudyData> = emptyList(),
     val monthlyData: List<DailyStudyData> = emptyList(),
+    val weekOffset: Int = 0,
+    val weekLabel: String = "",
+    val canGoBackWeek: Boolean = true,
+    val canGoForwardWeek: Boolean = false,
+    val monthOffset: Int = 0,
+    val canGoBackMonth: Boolean = true,
+    val canGoForwardMonth: Boolean = false,
     val currentStreak: Int = 0,
     val maxStreak: Int = 0,
     val totalWordsStudied: Int = 0,
@@ -93,8 +100,8 @@ class StatsViewModel @Inject constructor(
     companion object {
         private const val TAG = "StatsViewModel"
         private const val WEEKLY_DAYS = 7
-        /** Last N days for heatmap display (not calendar month). */
-        private const val MONTHLY_DAYS = 30
+        /** Last N days for heatmap/stats data (covers ~3 months for navigation). */
+        private const val MONTHLY_DAYS = 93
 
         /** Human-readable labels for the 3 mastery categories. */
         private val CATEGORY_LABELS = listOf(
@@ -110,6 +117,12 @@ class StatsViewModel @Inject constructor(
     val uiState: StateFlow<StatsUiState> = _uiState.asStateFlow()
 
     private var loadJob: Job? = null
+    private var currentStatsMap: Map<String, Int> = emptyMap()
+
+    /** Max weeks back (limited by MONTHLY_DAYS data). */
+    private val maxWeekBack = -(MONTHLY_DAYS / WEEKLY_DAYS - 1)
+    /** Max months back for heatmap navigation. */
+    private val maxMonthBack = -2
 
     init {
         loadStats()
@@ -131,8 +144,7 @@ class StatsViewModel @Inject constructor(
                 val maxStreak = studyRepository.getMaxStreak()
                 val masteryDistribution = buildMasteryDistribution()
 
-                // Generate date-based lists for the last 7 and 30 days
-                val weeklyDates = generateDateRange(WEEKLY_DAYS)
+                // Generate date-based list for the last 30 days (heatmap)
                 val monthlyDates = generateDateRange(MONTHLY_DAYS)
 
                 // Combine reactive Flow sources for continuous updates.
@@ -167,14 +179,11 @@ class StatsViewModel @Inject constructor(
                     val (rememberedNewWords, rememberedReviewWords) = rememberedCounts
                     // Build a lookup map from date -> studiedCount
                     val statsMap = recentStats.associate { it.date to it.studiedCount }
+                    currentStatsMap = statsMap
 
-                    // Fill in weekly data (most recent 7 days)
-                    val weeklyData = weeklyDates.map { date ->
-                        DailyStudyData(
-                            date = date,
-                            count = statsMap[date] ?: 0
-                        )
-                    }
+                    // Compute weekly data with current offset
+                    val currentOffset = _uiState.value.weekOffset
+                    val (weeklyData, weekLabel) = computeWeeklyData(currentOffset, statsMap)
 
                     // Fill in monthly data (most recent 30 days, for heatmap)
                     val monthlyData = monthlyDates.map { date ->
@@ -184,9 +193,18 @@ class StatsViewModel @Inject constructor(
                         )
                     }
 
+                    val currentMonthOffset = _uiState.value.monthOffset
+
                     StatsUiState(
                         weeklyData = weeklyData,
                         monthlyData = monthlyData,
+                        weekOffset = currentOffset,
+                        weekLabel = weekLabel,
+                        canGoBackWeek = currentOffset > maxWeekBack,
+                        canGoForwardWeek = currentOffset < 0,
+                        monthOffset = currentMonthOffset,
+                        canGoBackMonth = currentMonthOffset > maxMonthBack,
+                        canGoForwardMonth = currentMonthOffset < 0,
                         currentStreak = currentStreak,
                         maxStreak = maxStreak,
                         totalWordsStudied = totalStudied,
@@ -246,6 +264,68 @@ class StatsViewModel @Inject constructor(
 
         return (0 until days).map { offset ->
             startDate.plusDays(offset.toLong()).format(dateFormatter)
+        }
+    }
+
+    /**
+     * Compute weekly data for the given offset from the stats map.
+     * offset = 0 means current week, -1 = last week, etc.
+     * Returns (weeklyData, label) pair.
+     */
+    private fun computeWeeklyData(
+        offset: Int,
+        statsMap: Map<String, Int>
+    ): Pair<List<DailyStudyData>, String> {
+        val today = LocalDate.now()
+        val endDate = today.plusDays((offset * WEEKLY_DAYS).toLong())
+        val startDate = endDate.minusDays((WEEKLY_DAYS - 1).toLong())
+
+        val data = (0 until WEEKLY_DAYS).map { i ->
+            val date = startDate.plusDays(i.toLong())
+            DailyStudyData(
+                date = date.format(dateFormatter),
+                count = statsMap[date.format(dateFormatter)] ?: 0
+            )
+        }
+
+        val label = "${startDate.monthValue}/${startDate.dayOfMonth} - ${endDate.monthValue}/${endDate.dayOfMonth}"
+        return data to label
+    }
+
+    /**
+     * Shift the weekly chart view by [delta] weeks (-1 = back, +1 = forward).
+     */
+    fun shiftWeek(delta: Int) {
+        val currentOffset = _uiState.value.weekOffset
+        val newOffset = (currentOffset + delta).coerceIn(maxWeekBack, 0)
+        if (newOffset == currentOffset) return
+
+        val (weeklyData, weekLabel) = computeWeeklyData(newOffset, currentStatsMap)
+        _uiState.update {
+            it.copy(
+                weekOffset = newOffset,
+                weeklyData = weeklyData,
+                weekLabel = weekLabel,
+                canGoBackWeek = newOffset > maxWeekBack,
+                canGoForwardWeek = newOffset < 0
+            )
+        }
+    }
+
+    /**
+     * Shift the monthly heatmap view by [delta] months (-1 = back, +1 = forward).
+     */
+    fun shiftMonth(delta: Int) {
+        val currentOffset = _uiState.value.monthOffset
+        val newOffset = (currentOffset + delta).coerceIn(maxMonthBack, 0)
+        if (newOffset == currentOffset) return
+
+        _uiState.update {
+            it.copy(
+                monthOffset = newOffset,
+                canGoBackMonth = newOffset > maxMonthBack,
+                canGoForwardMonth = newOffset < 0
+            )
         }
     }
 
