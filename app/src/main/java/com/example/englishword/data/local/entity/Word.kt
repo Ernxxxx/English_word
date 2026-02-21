@@ -21,7 +21,9 @@ import androidx.room.PrimaryKey
         Index(value = ["masteryLevel"]),
         Index(value = ["nextReviewAt"]),
         Index(value = ["isAcquired"]),
+        Index(value = ["createdAt"]),
         Index(value = ["levelId", "nextReviewAt"]),
+        Index(value = ["levelId", "createdAt"]),
         Index(value = ["levelId", "english"], unique = true)
     ]
 )

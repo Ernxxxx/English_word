@@ -6,9 +6,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -48,7 +47,7 @@ class ProductionCrashReporter @Inject constructor(
         }
     }
 
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+    private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
     override fun recordException(throwable: Throwable) {
         Log.e(TAG, "Non-fatal exception", throwable)
@@ -85,7 +84,7 @@ class ProductionCrashReporter @Inject constructor(
     private fun appendToLog(level: String, message: String) {
         try {
             trimLogIfNeeded()
-            val timestamp = dateFormat.format(Date())
+            val timestamp = LocalDateTime.now().format(dateFormatter)
             logFile.appendText("[$timestamp] [$level] $message\n")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to write crash log", e)

@@ -85,5 +85,8 @@ secrets/
 ehthumbs.db
 Thumbs.db
 
+# Windows device name artifacts
+nul
+
 .kotlin/
 *.salive

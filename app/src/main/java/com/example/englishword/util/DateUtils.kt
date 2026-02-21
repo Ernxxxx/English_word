@@ -1,11 +1,10 @@
 package com.example.englishword.util
 
-import java.text.SimpleDateFormat
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.util.Date
-import java.util.Locale
 
 /**
  * Utility object for date-related operations.
@@ -76,8 +75,10 @@ object DateUtils {
      * @return Formatted date string (yyyy-MM-dd)
      */
     fun formatTimestamp(timestamp: Long): String {
-        val sdf = SimpleDateFormat(DATE_FORMAT, Locale.getDefault())
-        return sdf.format(Date(timestamp))
+        return Instant.ofEpochMilli(timestamp)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+            .format(DateTimeFormatter.ofPattern(DATE_FORMAT))
     }
 
     /**

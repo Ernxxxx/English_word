@@ -282,14 +282,14 @@
 
 ## コンポーネント一覧
 
-| コンポーネント名 | 用途 |
-|-----------------|------|
-| LevelCard | ホームのレベルカード |
-| FlashCard | 学習画面の単語カード |
-| ProgressBar | 進捗バー |
+| コンポーネント名  | 用途                     |
+| ----------------- | ------------------------ |
+| LevelCard         | ホームのレベルカード     |
+| FlashCard         | 学習画面の単語カード     |
+| ProgressBar       | 進捗バー                 |
 | EvaluationButtons | 覚えた/まだ/あとでボタン |
-| WordListItem | 単語一覧の行 |
-| WordEditForm | 単語追加/編集フォーム |
-| StreakBadge | 連続日数バッジ |
-| PremiumBanner | Premium誘導バナー |
-| OnboardingPage | オンボーディング1ページ |
+| WordListItem      | 単語一覧の行             |
+| WordEditForm      | 単語追加/編集フォーム    |
+| StreakBadge       | 連続日数バッジ           |
+| PremiumBanner     | Premium誘導バナー        |
+| OnboardingPage    | オンボーディング1ページ  |

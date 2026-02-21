@@ -389,6 +389,17 @@ object Migrations {
     }
 
     /**
+     * Migration from version 9 to 10.
+     * Adds indexes on words.createdAt and words(levelId, createdAt) for ORDER BY optimization.
+     */
+    val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_words_createdAt` ON `words` (`createdAt`)")
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_words_levelId_createdAt` ON `words` (`levelId`, `createdAt`)")
+        }
+    }
+
+    /**
      * Get all migrations for the database builder.
      */
     fun getAllMigrations(): Array<Migration> {
@@ -421,7 +432,8 @@ object Migrations {
             MIGRATION_3_8,
             MIGRATION_2_8,
             MIGRATION_1_8,
-            MIGRATION_8_9
+            MIGRATION_8_9,
+            MIGRATION_9_10
         )
     }
 }

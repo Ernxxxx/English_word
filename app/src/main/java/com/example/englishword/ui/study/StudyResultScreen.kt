@@ -60,7 +60,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.englishword.ads.AdManager
 import com.example.englishword.ui.components.SimpleBannerAdView
 import com.example.englishword.ui.theme.AppDimens
 import com.example.englishword.ui.theme.CorrectGreen
@@ -71,6 +70,8 @@ import kotlinx.coroutines.delay
 
 /**
  * Study result screen showing session statistics.
+ * Uses StudyResultViewModel to load session data from DB independently,
+ * ensuring resilience to process death and configuration changes.
  */
 @Composable
 fun StudyResultScreen(
@@ -78,19 +79,17 @@ fun StudyResultScreen(
     onNavigateToHome: () -> Unit,
     onNavigateToStudy: (Long) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: StudyViewModel = hiltViewModel()
+    viewModel: StudyResultViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isPremium by viewModel.adManager.isPremium.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context as? Activity
 
-    // Added: Track if interstitial ad has been shown for this session
     var adShown by remember { mutableStateOf(false) }
 
     when (val state = uiState) {
-        is StudyUiState.Completed -> {
-            // Added: Show interstitial ad when result screen appears (with frequency cap)
+        is StudyResultUiState.Success -> {
             LaunchedEffect(state.sessionId) {
                 if (!adShown && activity != null) {
                     viewModel.adManager.showInterstitialWithFrequencyCap(
@@ -103,15 +102,31 @@ fun StudyResultScreen(
             }
 
             StudyResultContent(
-                state = state,
+                totalCount = state.totalCount,
+                knownCount = state.knownCount,
+                againCount = state.againCount,
+                laterCount = state.laterCount,
+                streak = state.streak,
+                levelId = state.levelId,
                 isPremium = isPremium,
                 onNavigateToHome = onNavigateToHome,
                 onRetry = { onNavigateToStudy(state.levelId) },
                 modifier = modifier
             )
         }
-        else -> {
-            // Show loading if state is not yet available
+        is StudyResultUiState.Error -> {
+            Box(
+                modifier = modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = state.message,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+        is StudyResultUiState.Loading -> {
             Box(
                 modifier = modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -127,7 +142,12 @@ fun StudyResultScreen(
  */
 @Composable
 fun StudyResultContent(
-    state: StudyUiState.Completed,
+    totalCount: Int,
+    knownCount: Int,
+    againCount: Int,
+    laterCount: Int,
+    streak: Int,
+    levelId: Long = 0,
     isPremium: Boolean = false,
     onNavigateToHome: () -> Unit,
     onRetry: () -> Unit,
@@ -205,10 +225,10 @@ fun StudyResultContent(
                     )
                 ) {
                     StatsCard(
-                        totalCount = state.totalCount,
-                        knownCount = state.knownCount,
-                        againCount = state.againCount,
-                        laterCount = state.laterCount
+                        totalCount = totalCount,
+                        knownCount = knownCount,
+                        againCount = againCount,
+                        laterCount = laterCount
                     )
                 }
 
@@ -216,7 +236,7 @@ fun StudyResultContent(
 
                 // Streak display
                 AnimatedVisibility(
-                    visible = showContent && state.streak > 0,
+                    visible = showContent && streak > 0,
                     enter = slideInVertically(
                         initialOffsetY = { it / 2 },
                         animationSpec = tween(
@@ -231,7 +251,7 @@ fun StudyResultContent(
                         )
                     )
                 ) {
-                    StreakDisplay(streak = state.streak)
+                    StreakDisplay(streak = streak)
                 }
 
                 Spacer(modifier = Modifier.height(48.dp))
@@ -528,15 +548,11 @@ private fun ActionButtons(
 private fun StudyResultContentPreview() {
     EnglishWordTheme {
         StudyResultContent(
-            state = StudyUiState.Completed(
-                sessionId = 1,
-                levelId = 1,
-                totalCount = 20,
-                knownCount = 15,
-                againCount = 3,
-                laterCount = 2,
-                streak = 5
-            ),
+            totalCount = 20,
+            knownCount = 15,
+            againCount = 3,
+            laterCount = 2,
+            streak = 5,
             onNavigateToHome = {},
             onRetry = {}
         )
@@ -548,15 +564,11 @@ private fun StudyResultContentPreview() {
 private fun StudyResultContentNoStreakPreview() {
     EnglishWordTheme {
         StudyResultContent(
-            state = StudyUiState.Completed(
-                sessionId = 1,
-                levelId = 1,
-                totalCount = 10,
-                knownCount = 8,
-                againCount = 2,
-                laterCount = 0,
-                streak = 0
-            ),
+            totalCount = 10,
+            knownCount = 8,
+            againCount = 2,
+            laterCount = 0,
+            streak = 0,
             onNavigateToHome = {},
             onRetry = {}
         )

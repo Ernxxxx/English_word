@@ -47,12 +47,12 @@
 
 ### 1. Level（レベル）
 
-| カラム | 型 | 説明 |
-|--------|-----|------|
-| id | Long (PK) | 自動生成 |
-| name | String | レベル名（基礎、標準、上級） |
-| orderIndex | Int | 表示順 |
-| createdAt | Long | 作成日時（epoch ms） |
+| カラム     | 型        | 説明                         |
+| ---------- | --------- | ---------------------------- |
+| id         | Long (PK) | 自動生成                     |
+| name       | String    | レベル名（基礎、標準、上級） |
+| orderIndex | Int       | 表示順                       |
+| createdAt  | Long      | 作成日時（epoch ms）         |
 
 ```kotlin
 @Entity(tableName = "levels")
@@ -69,19 +69,19 @@ data class Level(
 
 ### 2. Word（単語）
 
-| カラム | 型 | 説明 |
-|--------|-----|------|
-| id | Long (PK) | 自動生成 |
-| levelId | Long (FK) | 所属レベル |
-| english | String | 英単語 |
-| japanese | String | 日本語訳 |
-| exampleEn | String? | 例文（英語） |
-| exampleJa | String? | 例文（日本語） |
-| masteryLevel | Int | 習熟度 0-5 |
-| nextReviewAt | Long | 次回復習日時 |
-| reviewCount | Int | 復習回数 |
-| createdAt | Long | 作成日時 |
-| updatedAt | Long | 更新日時 |
+| カラム       | 型        | 説明           |
+| ------------ | --------- | -------------- |
+| id           | Long (PK) | 自動生成       |
+| levelId      | Long (FK) | 所属レベル     |
+| english      | String    | 英単語         |
+| japanese     | String    | 日本語訳       |
+| exampleEn    | String?   | 例文（英語）   |
+| exampleJa    | String?   | 例文（日本語） |
+| masteryLevel | Int       | 習熟度 0-5     |
+| nextReviewAt | Long      | 次回復習日時   |
+| reviewCount  | Int       | 復習回数       |
+| createdAt    | Long      | 作成日時       |
+| updatedAt    | Long      | 更新日時       |
 
 ```kotlin
 @Entity(
@@ -116,14 +116,14 @@ data class Word(
 
 ### 3. StudySession（学習セッション）
 
-| カラム | 型 | 説明 |
-|--------|-----|------|
-| id | Long (PK) | 自動生成 |
-| levelId | Long (FK) | 学習したレベル |
-| startedAt | Long | 開始日時 |
-| completedAt | Long? | 完了日時 |
-| wordCount | Int | 学習単語数 |
-| masteredCount | Int | 覚えた数 |
+| カラム        | 型        | 説明           |
+| ------------- | --------- | -------------- |
+| id            | Long (PK) | 自動生成       |
+| levelId       | Long (FK) | 学習したレベル |
+| startedAt     | Long      | 開始日時       |
+| completedAt   | Long?     | 完了日時       |
+| wordCount     | Int       | 学習単語数     |
+| masteredCount | Int       | 覚えた数       |
 
 ```kotlin
 @Entity(
@@ -153,13 +153,13 @@ data class StudySession(
 
 ### 4. StudyRecord（学習記録）
 
-| カラム | 型 | 説明 |
-|--------|-----|------|
-| id | Long (PK) | 自動生成 |
-| sessionId | Long (FK) | セッションID |
-| wordId | Long (FK) | 単語ID |
-| result | Int | 結果（0:まだ, 1:あとで, 2:覚えた） |
-| reviewedAt | Long | 回答日時 |
+| カラム     | 型        | 説明                               |
+| ---------- | --------- | ---------------------------------- |
+| id         | Long (PK) | 自動生成                           |
+| sessionId  | Long (FK) | セッションID                       |
+| wordId     | Long (FK) | 単語ID                             |
+| result     | Int       | 結果（0:まだ, 1:あとで, 2:覚えた） |
+| reviewedAt | Long      | 回答日時                           |
 
 ```kotlin
 @Entity(
@@ -201,13 +201,13 @@ object ReviewResult {
 
 ### 5. UserStats（日別統計）
 
-| カラム | 型 | 説明 |
-|--------|-----|------|
-| id | Long (PK) | 自動生成 |
-| date | String (UNIQUE) | 日付 (yyyy-MM-dd) |
-| studiedCount | Int | 学習単語数 |
-| streak | Int | その時点の連続日数 |
-| lastStudyDate | String? | 最終学習日 |
+| カラム        | 型              | 説明               |
+| ------------- | --------------- | ------------------ |
+| id            | Long (PK)       | 自動生成           |
+| date          | String (UNIQUE) | 日付 (yyyy-MM-dd)  |
+| studiedCount  | Int             | 学習単語数         |
+| streak        | Int             | その時点の連続日数 |
+| lastStudyDate | String?         | 最終学習日         |
 
 ```kotlin
 @Entity(
@@ -228,10 +228,10 @@ data class UserStats(
 
 ### 6. UserSettings（設定）
 
-| カラム | 型 | 説明 |
-|--------|-----|------|
-| key | String (PK) | 設定キー |
-| value | String | 設定値 |
+| カラム | 型          | 説明     |
+| ------ | ----------- | -------- |
+| key    | String (PK) | 設定キー |
+| value  | String      | 設定値   |
 
 ```kotlin
 @Entity(tableName = "user_settings")

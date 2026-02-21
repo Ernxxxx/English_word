@@ -183,24 +183,20 @@ fun EnglishWordNavHost(
             )
         ) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getLong(NavArgs.SESSION_ID) ?: 0L
-            val studyViewModel: StudyViewModel = hiltViewModel()
             StudyResultScreen(
                 sessionId = sessionId,
                 onNavigateToHome = {
-                    // Clear entire back stack and navigate to HOME
                     navController.navigate(Routes.HOME) {
                         popUpTo(navController.graph.id) { inclusive = true }
                         launchSingleTop = true
                     }
                 },
                 onNavigateToStudy = { levelId ->
-                    // Keep HOME in back stack, replace current screen with Study
                     navController.navigate(Routes.study(levelId)) {
                         popUpTo(Routes.HOME) { inclusive = false }
                         launchSingleTop = true
                     }
-                },
-                viewModel = studyViewModel
+                }
             )
         }
 

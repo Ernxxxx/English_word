@@ -3,6 +3,8 @@ package com.example.englishword.ui.navigation
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.saveable.SaveableStateHolder
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
@@ -78,6 +80,7 @@ fun MainShellScreen(
     shellViewModel: ShellViewModel = hiltViewModel()
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    val saveableStateHolder = rememberSaveableStateHolder()
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val currentTab = ShellTab.entries.getOrElse(selectedTab) { ShellTab.entries.first() }
@@ -131,26 +134,27 @@ fun MainShellScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        // Crossfade provides animated transition between tabs.
-        // Note: For true state preservation across tab switches, consider
-        // using SaveableStateHolder or NavHost with bottom nav integration.
+        // Crossfade with SaveableStateHolder preserves each tab's UI state
+        // (scroll position, text fields, etc.) across tab switches.
         Crossfade(targetState = currentTab, label = "tab_crossfade") { tab ->
-            when (tab) {
-                ShellTab.HOME -> HomeTab(
-                    onNavigateToStudy = onNavigateToStudy,
-                    onNavigateToUnitTest = onNavigateToUnitTest,
-                    onNavigateToWordList = onNavigateToWordList,
-                    onNavigateToPremium = onNavigateToPremium,
-                    modifier = Modifier.padding(paddingValues)
-                )
-                ShellTab.STATS -> StatsTab(
-                    modifier = Modifier.padding(paddingValues)
-                )
-                ShellTab.SETTINGS -> SettingsTab(
-                    onNavigateToPremium = onNavigateToPremium,
-                    snackbarHostState = snackbarHostState,
-                    modifier = Modifier.padding(paddingValues)
-                )
+            saveableStateHolder.SaveableStateProvider(tab) {
+                when (tab) {
+                    ShellTab.HOME -> HomeTab(
+                        onNavigateToStudy = onNavigateToStudy,
+                        onNavigateToUnitTest = onNavigateToUnitTest,
+                        onNavigateToWordList = onNavigateToWordList,
+                        onNavigateToPremium = onNavigateToPremium,
+                        modifier = Modifier.padding(paddingValues)
+                    )
+                    ShellTab.STATS -> StatsTab(
+                        modifier = Modifier.padding(paddingValues)
+                    )
+                    ShellTab.SETTINGS -> SettingsTab(
+                        onNavigateToPremium = onNavigateToPremium,
+                        snackbarHostState = snackbarHostState,
+                        modifier = Modifier.padding(paddingValues)
+                    )
+                }
             }
         }
     }

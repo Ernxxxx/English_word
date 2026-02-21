@@ -27,7 +27,7 @@ import com.example.englishword.data.local.entity.Word
         UserSettings::class,
         UnitUnlock::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
