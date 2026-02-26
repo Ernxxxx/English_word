@@ -168,7 +168,7 @@ fun SettingsTab(
                     icon = Icons.Default.Policy,
                     title = "利用規約",
                     onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/terms"))
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ernxxxx.github.io/English_word/terms_of_service.html"))
                         context.startActivity(intent)
                     }
                 )
@@ -177,7 +177,7 @@ fun SettingsTab(
                     icon = Icons.Default.Policy,
                     title = "プライバシーポリシー",
                     onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/privacy"))
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ernxxxx.github.io/English_word/privacy_policy.html"))
                         context.startActivity(intent)
                     }
                 )
@@ -187,7 +187,7 @@ fun SettingsTab(
                     title = "お問い合わせ",
                     onClick = {
                         val intent = Intent(Intent.ACTION_SENDTO).apply {
-                            data = Uri.parse("mailto:support@example.com")
+                            data = Uri.parse("mailto:longsandao@gmail.com")
                             putExtra(Intent.EXTRA_SUBJECT, "English Word アプリについて")
                         }
                         context.startActivity(intent)
@@ -367,7 +367,7 @@ fun SettingsScreen(
                         icon = Icons.Default.Policy,
                         title = "利用規約",
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/terms"))
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ernxxxx.github.io/English_word/terms_of_service.html"))
                             context.startActivity(intent)
                         }
                     )
@@ -379,7 +379,7 @@ fun SettingsScreen(
                         icon = Icons.Default.Policy,
                         title = "プライバシーポリシー",
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/privacy"))
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ernxxxx.github.io/English_word/privacy_policy.html"))
                             context.startActivity(intent)
                         }
                     )
@@ -392,7 +392,7 @@ fun SettingsScreen(
                         title = "お問い合わせ",
                         onClick = {
                             val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:support@example.com")
+                                data = Uri.parse("mailto:longsandao@gmail.com")
                                 putExtra(Intent.EXTRA_SUBJECT, "English Word アプリについて")
                             }
                             context.startActivity(intent)

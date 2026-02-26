@@ -101,8 +101,8 @@ https://policies.google.com/privacy
 本プライバシーポリシーに関するご質問やご意見がございましたら、以下までご連絡ください：
 
 - **開発者**: [開発者名/会社名]
-- **メールアドレス**: [your-email@example.com]
-- **ウェブサイト**: [https://your-website.com]
+- **メールアドレス**: longsandao@gmail.com
+- **ウェブサイト**: https://ernxxxx.github.io/English_word/
 
 ---
 
